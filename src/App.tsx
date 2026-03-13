@@ -1,0 +1,1358 @@
+import { useState, useEffect, useRef, useCallback } from "react"
+import {
+  Radar,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip as RechartsTooltip,
+  LineChart,
+  Line,
+  ResponsiveContainer,
+  Cell,
+} from "recharts"
+import {
+  DollarSign,
+  Eye,
+  ShoppingCart,
+  MessageCircle,
+  Target,
+  Info,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  ChevronRight,
+  ChevronLeft,
+  BarChart3,
+  FileText,
+  SlidersHorizontal,
+  ClipboardList,
+  RotateCcw,
+} from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import { Slider } from "@/components/ui/slider"
+import { Progress } from "@/components/ui/progress"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  TooltipProvider,
+} from "@/components/ui/tooltip"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+
+import {
+  DIMENSIONS,
+  PILLAR_COLORS,
+  PILLAR_LABELS,
+  LEVEL_COLORS,
+  LEVEL_LABELS,
+  SAMPLE_DATA,
+  calculateBH360,
+  formatDimensionValue,
+  getDimensionValue,
+  normalize,
+  normalizeNSS,
+  type PeriodData,
+  type NormalizedScores,
+} from "@/lib/bh360"
+
+import resetLogo from "@/assets/reset-blanco.png"
+import wantedLogo from "@/assets/wanted-blanco.png"
+
+// ─── Utility Components ───────────────────────────────────────
+
+function AnimatedScore({ value, duration = 1200 }: { value: number; duration?: number }) {
+  const [display, setDisplay] = useState(0)
+  const ref = useRef<number | null>(null)
+
+  useEffect(() => {
+    const start = performance.now()
+    const from = display
+    const to = value
+
+    function tick(now: number) {
+      const elapsed = now - start
+      const progress = Math.min(elapsed / duration, 1)
+      const eased = 1 - Math.pow(1 - progress, 3)
+      setDisplay(Math.round((from + (to - from) * eased) * 10) / 10)
+      if (progress < 1) {
+        ref.current = requestAnimationFrame(tick)
+      }
+    }
+
+    ref.current = requestAnimationFrame(tick)
+    return () => {
+      if (ref.current) cancelAnimationFrame(ref.current)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, duration])
+
+  return <span>{display.toFixed(1)}</span>
+}
+
+function DimIcon({ id, className }: { id: string; className?: string }) {
+  const props = { className: className ?? "h-5 w-5", strokeWidth: 1.5 }
+  switch (id) {
+    case "investment":
+      return <DollarSign {...props} />
+    case "reach":
+      return <Eye {...props} />
+    case "purchase":
+      return <ShoppingCart {...props} />
+    case "sentiment":
+      return <MessageCircle {...props} />
+    case "sales":
+      return <Target {...props} />
+    default:
+      return <BarChart3 {...props} />
+  }
+}
+
+function PillarBadge({ pillar }: { pillar: string }) {
+  return (
+    <Badge
+      variant="outline"
+      className="text-xs border-opacity-50"
+      style={{ borderColor: PILLAR_COLORS[pillar], color: PILLAR_COLORS[pillar] }}
+    >
+      {PILLAR_LABELS[pillar]}
+    </Badge>
+  )
+}
+
+function ScoreRing({
+  score,
+  size = 180,
+  strokeWidth = 12,
+  color,
+}: {
+  score: number
+  size?: number
+  strokeWidth?: number
+  color?: string
+}) {
+  const radius = (size - strokeWidth) / 2
+  const circumference = 2 * Math.PI * radius
+  const [offset, setOffset] = useState(circumference)
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setOffset(circumference - (score / 100) * circumference)
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [score, circumference])
+
+  const fillColor = color ?? LEVEL_COLORS[getLevel(score)]
+
+  return (
+    <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
+      <svg
+        width={size}
+        height={size}
+        className="transform -rotate-90"
+        aria-hidden="true"
+      >
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="rgba(255,255,255,0.08)"
+          strokeWidth={strokeWidth}
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={fillColor}
+          strokeWidth={strokeWidth}
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          className="transition-all duration-1000 ease-out"
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-4xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>
+          <AnimatedScore value={score} />
+        </span>
+        <span className="text-xs text-zinc-500 mt-1">/ 100</span>
+      </div>
+    </div>
+  )
+}
+
+function Delta({ current, previous }: { current: number; previous?: number }) {
+  if (previous === undefined) return null
+  const diff = Math.round((current - previous) * 10) / 10
+  if (diff === 0) return <span className="text-zinc-500 text-sm flex items-center gap-1"><Minus className="h-3 w-3" /> 0</span>
+  const isPositive = diff > 0
+  return (
+    <span className={`text-sm flex items-center gap-1 ${isPositive ? "text-emerald-400" : "text-red-400"}`}>
+      {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+      {isPositive ? "+" : ""}
+      {diff}
+    </span>
+  )
+}
+
+function Spark({ data, dimId }: { data: PeriodData[]; dimId: string }) {
+  const points = data.map((d) => ({
+    v: dimId === "sentiment"
+      ? normalizeNSS(getDimensionValue(d, dimId))
+      : normalize(getDimensionValue(d, dimId), DIMENSIONS.find((x) => x.id === dimId)!.floor, DIMENSIONS.find((x) => x.id === dimId)!.ceiling),
+  }))
+  return (
+    <ResponsiveContainer width={80} height={32}>
+      <LineChart data={points}>
+        <Line
+          type="monotone"
+          dataKey="v"
+          stroke="#f59e0b"
+          strokeWidth={1.5}
+          dot={false}
+        />
+      </LineChart>
+    </ResponsiveContainer>
+  )
+}
+
+function InfoModal({ dim }: { dim: typeof DIMENSIONS[number] }) {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <button className="p-1 rounded hover:bg-zinc-800 focus:ring-2 focus:ring-amber-400/50 focus:outline-none transition-colors">
+          <Info className="h-4 w-4 text-zinc-500" />
+        </button>
+      </DialogTrigger>
+      <DialogContent className="bg-zinc-900 border-zinc-700 max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-zinc-100">
+            <DimIcon id={dim.id} />
+            {dim.label}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 text-sm">
+          <div>
+            <span className="text-zinc-500">Definicion</span>
+            <p className="text-zinc-300 mt-1">{dim.description}</p>
+          </div>
+          <Separator className="bg-zinc-700" />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <span className="text-zinc-500">Pilar</span>
+              <div className="mt-1"><PillarBadge pillar={dim.pillar} /></div>
+            </div>
+            <div>
+              <span className="text-zinc-500">Peso</span>
+              <p className="text-zinc-300 mt-1 font-mono">{(dim.weight * 100).toFixed(0)}%</p>
+            </div>
+            <div>
+              <span className="text-zinc-500">Piso</span>
+              <p className="text-zinc-300 mt-1 font-mono">{formatDimensionValue(dim.id, dim.floor)}</p>
+            </div>
+            <div>
+              <span className="text-zinc-500">Techo</span>
+              <p className="text-zinc-300 mt-1 font-mono">{formatDimensionValue(dim.id, dim.ceiling)}</p>
+            </div>
+          </div>
+          <Separator className="bg-zinc-700" />
+          <div>
+            <span className="text-zinc-500">Fuente</span>
+            <p className="text-zinc-300 mt-1">{dim.source}</p>
+          </div>
+          <div>
+            <span className="text-zinc-500">Sustento</span>
+            <p className="text-zinc-300 mt-1">{dim.justification}</p>
+          </div>
+          <Separator className="bg-zinc-700" />
+          <div>
+            <span className="text-zinc-500">Formula de normalizacion</span>
+            <p className="text-zinc-300 mt-1 font-mono text-xs">
+              {dim.id === "sentiment"
+                ? "N = ((NSS + 100) / 200) * 100"
+                : `N = min(100, max(0, (x - ${dim.floor}) / (${dim.ceiling} - ${dim.floor}) * 100))`}
+            </p>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function getLevel(score: number): string {
+  if (score <= 30) return "critical"
+  if (score <= 50) return "weak"
+  if (score <= 70) return "moderate"
+  if (score <= 85) return "strong"
+  return "exceptional"
+}
+
+// ─── Report View ──────────────────────────────────────────────
+
+function ReportView({
+  data,
+  selectedIndex,
+}: {
+  data: PeriodData[]
+  selectedIndex: number
+}) {
+  const current = data[selectedIndex]
+  const previous = selectedIndex > 0 ? data[selectedIndex - 1] : undefined
+  const result = calculateBH360(current)
+  const prevResult = previous ? calculateBH360(previous) : undefined
+
+  const radarData = DIMENSIONS.map((dim) => ({
+    dimension: dim.label.split(" ")[0],
+    current: result.normalized[dim.id as keyof NormalizedScores],
+    previous: prevResult
+      ? prevResult.normalized[dim.id as keyof NormalizedScores]
+      : undefined,
+  }))
+
+  const waterfallData = DIMENSIONS.map((dim) => ({
+    name: dim.label.split(" ")[0],
+    value: Math.round(result.contributions[dim.id] * 10) / 10,
+    fill: PILLAR_COLORS[dim.pillar],
+  }))
+
+  // Diagnostico automatico
+  const sorted = DIMENSIONS.map((dim) => ({
+    ...dim,
+    score: result.normalized[dim.id as keyof NormalizedScores],
+  })).sort((a, b) => b.score - a.score)
+  const strongest = sorted[0]
+  const weakest = sorted[sorted.length - 1]
+
+  return (
+    <div className="space-y-6">
+      {/* Hero Card */}
+      <Card className="bg-zinc-900/60 border-zinc-800">
+        <CardContent className="p-6">
+          <div className="flex flex-col md:flex-row items-center gap-6">
+            <ScoreRing score={result.score} />
+            <div className="flex-1 space-y-3">
+              <div>
+                <h2 className="text-2xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>
+                  {current.brand}
+                </h2>
+                <p className="text-zinc-400 text-sm">
+                  {current.period} — {current.campaign}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Badge
+                  className="text-xs"
+                  style={{
+                    backgroundColor: LEVEL_COLORS[result.level] + "20",
+                    color: LEVEL_COLORS[result.level],
+                    borderColor: LEVEL_COLORS[result.level],
+                  }}
+                  variant="outline"
+                >
+                  {LEVEL_LABELS[result.level]}
+                </Badge>
+                <Delta current={result.score} previous={prevResult?.score} />
+              </div>
+              <div className="space-y-2 mt-4">
+                {Object.entries(PILLAR_LABELS).map(([key, label]) => (
+                  <div key={key} className="flex items-center gap-3">
+                    <span className="text-xs text-zinc-500 w-24">{label}</span>
+                    <div className="flex-1">
+                      <Progress
+                        value={result.pillarScores[key]}
+                        className="h-2 bg-zinc-800"
+                        style={
+                          {
+                            "--progress-color": PILLAR_COLORS[key],
+                          } as React.CSSProperties
+                        }
+                      />
+                    </div>
+                    <span className="text-xs font-mono text-zinc-400 w-10 text-right">
+                      {result.pillarScores[key].toFixed(0)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Radar + Dimension Cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="bg-zinc-900/60 border-zinc-800 lg:col-span-1">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-zinc-400">Perfil Dimensional</CardTitle>
+          </CardHeader>
+          <CardContent className="flex justify-center">
+            <ResponsiveContainer width={280} height={260}>
+              <RadarChart data={radarData}>
+                <PolarGrid stroke="rgba(255,255,255,0.08)" />
+                <PolarAngleAxis
+                  dataKey="dimension"
+                  tick={{ fill: "#a1a1aa", fontSize: 11 }}
+                />
+                <PolarRadiusAxis
+                  angle={90}
+                  domain={[0, 100]}
+                  tick={{ fill: "#71717a", fontSize: 9 }}
+                />
+                {prevResult && (
+                  <Radar
+                    name="Anterior"
+                    dataKey="previous"
+                    stroke="#71717a"
+                    fill="transparent"
+                    strokeDasharray="4 4"
+                    strokeWidth={1.5}
+                  />
+                )}
+                <Radar
+                  name="Actual"
+                  dataKey="current"
+                  stroke="#f59e0b"
+                  fill="#f59e0b"
+                  fillOpacity={0.15}
+                  strokeWidth={2}
+                />
+              </RadarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {DIMENSIONS.map((dim) => {
+            const normScore = result.normalized[dim.id as keyof NormalizedScores]
+            const rawValue = getDimensionValue(current, dim.id)
+            const prevNorm = prevResult
+              ? prevResult.normalized[dim.id as keyof NormalizedScores]
+              : undefined
+
+            return (
+              <Card key={dim.id} className="bg-zinc-900/60 border-zinc-800">
+                <CardContent className="p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="p-1.5 rounded"
+                        style={{ backgroundColor: PILLAR_COLORS[dim.pillar] + "20" }}
+                      >
+                        <DimIcon
+                          id={dim.id}
+                          className="h-4 w-4"
+                        />
+                      </div>
+                      <span className="text-xs text-zinc-400">{dim.label}</span>
+                    </div>
+                    <InfoModal dim={dim} />
+                  </div>
+                  <div className="flex items-end justify-between">
+                    <div>
+                      <span className="text-2xl font-bold text-zinc-100 font-mono">
+                        {normScore.toFixed(0)}
+                      </span>
+                      <span className="text-xs text-zinc-500 ml-1">/100</span>
+                    </div>
+                    <Spark data={data} dimId={dim.id} />
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-zinc-500">
+                      {formatDimensionValue(dim.id, rawValue)}
+                    </span>
+                    <Delta current={normScore} previous={prevNorm} />
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <PillarBadge pillar={dim.pillar} />
+                    <span className="text-zinc-500 font-mono">
+                      +{result.contributions[dim.id].toFixed(1)} pts
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Waterfall Chart */}
+      <Card className="bg-zinc-900/60 border-zinc-800">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm text-zinc-400">Contribucion por Dimension</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={waterfallData} barCategoryGap="20%">
+              <XAxis dataKey="name" tick={{ fill: "#a1a1aa", fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: "#71717a", fontSize: 10 }} axisLine={false} tickLine={false} />
+              <RechartsTooltip
+                contentStyle={{ backgroundColor: "#18181b", borderColor: "#3f3f46", borderRadius: 8 }}
+                labelStyle={{ color: "#a1a1aa" }}
+                itemStyle={{ color: "#f4f4f5" }}
+                formatter={(v) => [`${Number(v).toFixed(1)} pts`, "Contribucion"]}
+              />
+              <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                {waterfallData.map((entry, i) => (
+                  <Cell key={i} fill={entry.fill} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Diagnostico */}
+      <Card
+        className="bg-zinc-900/60 border-l-4"
+        style={{ borderLeftColor: LEVEL_COLORS[result.level], borderTopColor: "#27272a", borderRightColor: "#27272a", borderBottomColor: "#27272a" }}
+      >
+        <CardContent className="p-6 space-y-2">
+          <h3 className="text-sm font-semibold text-zinc-100">Diagnostico</h3>
+          <p className="text-sm text-zinc-300">{result.interpretation}</p>
+          <p className="text-sm text-zinc-400">
+            La dimension mas fuerte es <strong className="text-zinc-200">{strongest.label}</strong> ({strongest.score.toFixed(0)}/100).
+            La dimension mas debil es <strong className="text-zinc-200">{weakest.label}</strong> ({weakest.score.toFixed(0)}/100).
+          </p>
+          {weakest.score < 40 && (
+            <p className="text-sm text-amber-400">
+              Se recomienda una intervencion focalizada en {weakest.label} para mejorar el indice general.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+// ─── Data Entry View ──────────────────────────────────────────
+
+const ENTRY_STEPS = [
+  { id: "campaign", label: "Campana", dimId: null },
+  ...DIMENSIONS.map((d) => ({ id: d.id, label: d.label, dimId: d.id })),
+]
+
+function DataEntryView({
+  data,
+  onAddPeriod,
+}: {
+  data: PeriodData[]
+  onAddPeriod: (p: PeriodData) => void
+}) {
+  const [step, setStep] = useState(0)
+  const [form, setForm] = useState<Partial<PeriodData>>({
+    brand: "San Fernando",
+    period: "",
+    campaign: "",
+    investment: 0,
+    reach: 0,
+    purchase: 0,
+    sentiment: 0,
+    sales: 0,
+  })
+
+  const update = (field: string, value: string | number) =>
+    setForm((prev) => ({ ...prev, [field]: value }))
+
+  const canNext = step === 0
+    ? (form.period?.length ?? 0) > 0 && (form.campaign?.length ?? 0) > 0
+    : true
+
+  const preview = calculateBH360({
+    period: form.period ?? "",
+    brand: form.brand ?? "",
+    campaign: form.campaign ?? "",
+    investment: form.investment ?? 0,
+    reach: form.reach ?? 0,
+    purchase: form.purchase ?? 0,
+    sentiment: form.sentiment ?? 0,
+    sales: form.sales ?? 0,
+  })
+
+  const handleSave = () => {
+    onAddPeriod(form as PeriodData)
+    setStep(0)
+    setForm({
+      brand: "San Fernando",
+      period: "",
+      campaign: "",
+      investment: 0,
+      reach: 0,
+      purchase: 0,
+      sentiment: 0,
+      sales: 0,
+    })
+  }
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="lg:col-span-2 space-y-6">
+        {/* Stepper */}
+        <nav role="navigation" aria-label="Pasos de ingreso" className="flex items-center gap-1 overflow-x-auto pb-2">
+          {ENTRY_STEPS.map((s, i) => (
+            <button
+              key={s.id}
+              onClick={() => setStep(i)}
+              aria-current={i === step ? "step" : undefined}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition-colors ${
+                i === step
+                  ? "bg-amber-500/20 text-amber-400 font-medium"
+                  : i < step
+                  ? "bg-zinc-800 text-zinc-300"
+                  : "bg-zinc-900 text-zinc-500"
+              }`}
+            >
+              <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-mono border border-current">
+                {i + 1}
+              </span>
+              {s.label}
+            </button>
+          ))}
+        </nav>
+
+        {/* Step Content */}
+        <Card className="bg-zinc-900/60 border-zinc-800">
+          <CardContent className="p-6 space-y-4">
+            {step === 0 && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="period">Periodo</Label>
+                  <Input
+                    id="period"
+                    placeholder="Ej: Q3 2026"
+                    value={form.period ?? ""}
+                    onChange={(e) => update("period", e.target.value)}
+                    className="bg-zinc-800 border-zinc-700"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="brand">Marca</Label>
+                  <Input
+                    id="brand"
+                    value={form.brand ?? ""}
+                    onChange={(e) => update("brand", e.target.value)}
+                    className="bg-zinc-800 border-zinc-700"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="campaign">Campana</Label>
+                  <Input
+                    id="campaign"
+                    placeholder="Ej: Navidad + Pavo"
+                    value={form.campaign ?? ""}
+                    onChange={(e) => update("campaign", e.target.value)}
+                    className="bg-zinc-800 border-zinc-700"
+                  />
+                </div>
+              </>
+            )}
+            {step > 0 && (() => {
+              const dim = DIMENSIONS[step - 1]
+              const fieldId = dim.id
+              return (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <DimIcon id={dim.id} className="h-5 w-5 text-zinc-400" />
+                      <h3 className="text-lg font-semibold text-zinc-100">{dim.label}</h3>
+                    </div>
+                    <InfoModal dim={dim} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor={fieldId}>
+                      Valor ({dim.unit})
+                    </Label>
+                    <Input
+                      id={fieldId}
+                      type="number"
+                      placeholder={`Rango: ${dim.floor} - ${dim.ceiling}`}
+                      value={form[fieldId as keyof typeof form] ?? 0}
+                      onChange={(e) => update(fieldId, Number(e.target.value))}
+                      className="bg-zinc-800 border-zinc-700"
+                    />
+                    <p className="text-xs text-zinc-500">
+                      Fuente: {dim.source}. Peso en el indice: {(dim.weight * 100).toFixed(0)}%.
+                    </p>
+                  </div>
+                </div>
+              )
+            })()}
+
+            <div className="flex items-center justify-between pt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setStep(Math.max(0, step - 1))}
+                disabled={step === 0}
+                className="border-zinc-700"
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
+              </Button>
+              {step < ENTRY_STEPS.length - 1 ? (
+                <Button
+                  size="sm"
+                  onClick={() => setStep(step + 1)}
+                  disabled={!canNext}
+                  className="bg-amber-500 hover:bg-amber-600 text-zinc-900"
+                >
+                  Siguiente <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={handleSave}
+                  className="bg-amber-500 hover:bg-amber-600 text-zinc-900"
+                >
+                  Guardar Periodo
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Historical Table */}
+        {data.length > 0 && (
+          <Card className="bg-zinc-900/60 border-zinc-800">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-zinc-400">Historico de Periodos</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table role="table" className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-zinc-800">
+                      <th className="text-left py-2 px-2 text-zinc-500 font-medium">Periodo</th>
+                      <th className="text-left py-2 px-2 text-zinc-500 font-medium">Campana</th>
+                      {DIMENSIONS.map((d) => (
+                        <th key={d.id} className="text-right py-2 px-2 text-zinc-500 font-medium">
+                          {d.label.split(" ")[0]}
+                        </th>
+                      ))}
+                      <th className="text-right py-2 px-2 text-zinc-500 font-medium">BH360</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.map((row, i) => {
+                      const r = calculateBH360(row)
+                      return (
+                        <tr key={i} className="border-b border-zinc-800/50">
+                          <td className="py-2 px-2 text-zinc-300">{row.period}</td>
+                          <td className="py-2 px-2 text-zinc-400 text-xs">{row.campaign}</td>
+                          {DIMENSIONS.map((d) => (
+                            <td key={d.id} className="text-right py-2 px-2 text-zinc-300 font-mono text-xs">
+                              {formatDimensionValue(d.id, getDimensionValue(row, d.id))}
+                            </td>
+                          ))}
+                          <td className="text-right py-2 px-2 font-bold font-mono" style={{ color: LEVEL_COLORS[r.level] }}>
+                            {r.score.toFixed(1)}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Live Preview */}
+      <div className="space-y-4">
+        <Card className="bg-zinc-900/60 border-zinc-800 sticky top-20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-zinc-400">Preview en Vivo</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col items-center gap-4">
+            <ScoreRing score={preview.score} size={140} strokeWidth={10} />
+            <Badge
+              variant="outline"
+              style={{
+                borderColor: LEVEL_COLORS[preview.level],
+                color: LEVEL_COLORS[preview.level],
+              }}
+            >
+              {LEVEL_LABELS[preview.level]}
+            </Badge>
+            <div className="w-full space-y-2 mt-2">
+              {DIMENSIONS.map((dim) => {
+                const normVal = preview.normalized[dim.id as keyof NormalizedScores]
+                return (
+                  <div key={dim.id} className="flex items-center gap-2 text-xs">
+                    <DimIcon id={dim.id} className="h-3 w-3 text-zinc-500" />
+                    <span className="text-zinc-500 flex-1">{dim.label.split(" ")[0]}</span>
+                    <span className="font-mono text-zinc-300">{normVal.toFixed(0)}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}
+
+// ─── Simulator View ───────────────────────────────────────────
+
+function SimView({
+  data,
+  selectedIndex,
+}: {
+  data: PeriodData[]
+  selectedIndex: number
+}) {
+  const current = data[selectedIndex]
+  const actualResult = calculateBH360(current)
+
+  const [simValues, setSimValues] = useState<Record<string, number>>(() => {
+    const initial: Record<string, number> = {}
+    for (const dim of DIMENSIONS) {
+      initial[dim.id] = actualResult.normalized[dim.id as keyof NormalizedScores]
+    }
+    return initial
+  })
+
+  const resetSim = useCallback(() => {
+    const initial: Record<string, number> = {}
+    for (const dim of DIMENSIONS) {
+      initial[dim.id] = actualResult.normalized[dim.id as keyof NormalizedScores]
+    }
+    setSimValues(initial)
+  }, [actualResult])
+
+  // Calculate simulated score from normalized values
+  const simScore = DIMENSIONS.reduce(
+    (acc, dim) => acc + (simValues[dim.id] ?? 0) * dim.weight,
+    0
+  )
+
+  const simRadarData = DIMENSIONS.map((dim) => ({
+    dimension: dim.label.split(" ")[0],
+    actual: actualResult.normalized[dim.id as keyof NormalizedScores],
+    simulado: simValues[dim.id] ?? 0,
+  }))
+
+  const presets = [
+    {
+      label: "+50% Inversion",
+      apply: () => {
+        const v = Math.min(100, (simValues.investment ?? 0) * 1.5)
+        setSimValues((prev) => ({ ...prev, investment: v }))
+      },
+    },
+    {
+      label: "Sentiment -20",
+      apply: () => {
+        const v = Math.max(0, (simValues.sentiment ?? 0) - 20)
+        setSimValues((prev) => ({ ...prev, sentiment: v }))
+      },
+    },
+    {
+      label: "Optimista",
+      apply: () => {
+        const optimistic: Record<string, number> = {}
+        for (const dim of DIMENSIONS) {
+          optimistic[dim.id] = Math.min(100, actualResult.normalized[dim.id as keyof NormalizedScores] * 1.3)
+        }
+        setSimValues(optimistic)
+      },
+    },
+    {
+      label: "Pesimista",
+      apply: () => {
+        const pessimistic: Record<string, number> = {}
+        for (const dim of DIMENSIONS) {
+          pessimistic[dim.id] = actualResult.normalized[dim.id as keyof NormalizedScores] * 0.7
+        }
+        setSimValues(pessimistic)
+      },
+    },
+  ]
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Sliders */}
+        <div className="lg:col-span-1 space-y-4">
+          <Card className="bg-zinc-900/60 border-zinc-800">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm text-zinc-400">Ajustar Dimensiones</CardTitle>
+                <Button variant="ghost" size="sm" onClick={resetSim} className="text-zinc-500 hover:text-zinc-300">
+                  <RotateCcw className="h-3 w-3 mr-1" /> Reset
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {DIMENSIONS.map((dim) => (
+                <div key={dim.id} className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <DimIcon id={dim.id} className="h-4 w-4 text-zinc-400" />
+                      <span className="text-xs text-zinc-400">{dim.label.split(" ")[0]}</span>
+                    </div>
+                    <span className="text-xs font-mono text-zinc-300">
+                      {(simValues[dim.id] ?? 0).toFixed(0)}
+                    </span>
+                  </div>
+                  <Slider
+                    value={[simValues[dim.id] ?? 0]}
+                    max={100}
+                    step={1}
+                    aria-label={dim.label}
+                    onValueChange={([v]) => setSimValues((prev) => ({ ...prev, [dim.id]: v }))}
+                    className="[&_[role=slider]]:bg-amber-400"
+                  />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <div className="flex flex-wrap gap-2">
+            {presets.map((p) => (
+              <Button
+                key={p.label}
+                variant="outline"
+                size="sm"
+                onClick={p.apply}
+                className="text-xs border-zinc-700"
+              >
+                {p.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        {/* Score + Radar */}
+        <div className="lg:col-span-2 space-y-6">
+          <Card className="bg-zinc-900/60 border-zinc-800">
+            <CardContent className="p-6 flex flex-col items-center gap-4">
+              <div className="flex items-center gap-8">
+                <div className="text-center">
+                  <p className="text-xs text-zinc-500 mb-2">Actual</p>
+                  <ScoreRing score={actualResult.score} size={120} strokeWidth={8} />
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-zinc-500 mb-2">Simulado</p>
+                  <ScoreRing score={simScore} size={120} strokeWidth={8} color="#f59e0b" />
+                </div>
+              </div>
+              <Delta
+                current={Math.round(simScore * 10) / 10}
+                previous={actualResult.score}
+              />
+            </CardContent>
+          </Card>
+
+          <Card className="bg-zinc-900/60 border-zinc-800">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-zinc-400">Actual vs Simulado</CardTitle>
+            </CardHeader>
+            <CardContent className="flex justify-center">
+              <ResponsiveContainer width={320} height={280}>
+                <RadarChart data={simRadarData}>
+                  <PolarGrid stroke="rgba(255,255,255,0.08)" />
+                  <PolarAngleAxis dataKey="dimension" tick={{ fill: "#a1a1aa", fontSize: 11 }} />
+                  <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fill: "#71717a", fontSize: 9 }} />
+                  <Radar
+                    name="Actual"
+                    dataKey="actual"
+                    stroke="#71717a"
+                    fill="transparent"
+                    strokeDasharray="4 4"
+                    strokeWidth={1.5}
+                  />
+                  <Radar
+                    name="Simulado"
+                    dataKey="simulado"
+                    stroke="#f59e0b"
+                    fill="#f59e0b"
+                    fillOpacity={0.15}
+                    strokeWidth={2}
+                  />
+                </RadarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Methodology View ─────────────────────────────────────────
+
+function MethodView() {
+  const sections = [
+    { id: "what", label: "Que es el BH360" },
+    { id: "framework", label: "Marco Teorico" },
+    { id: "dims", label: "Las 5 Dimensiones" },
+    { id: "weights", label: "Pesos y Evidencia" },
+    { id: "form", label: "Formula" },
+    { id: "sensitivity", label: "Sensibilidad" },
+    { id: "roadmap", label: "Roadmap" },
+    { id: "refs", label: "Referencias" },
+  ]
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      {/* Sidebar */}
+      <nav aria-label="Secciones de metodologia" className="hidden lg:block">
+        <div className="sticky top-20 space-y-1">
+          {sections.map((s) => (
+            <a
+              key={s.id}
+              href={`#${s.id}`}
+              className="block px-3 py-2 text-sm text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50 rounded transition-colors"
+            >
+              {s.label}
+            </a>
+          ))}
+        </div>
+      </nav>
+
+      {/* Content */}
+      <div className="lg:col-span-3 space-y-8">
+        <section id="what" className="space-y-3">
+          <h2 className="text-xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>Que es el BH360</h2>
+          <p className="text-sm text-zinc-300 leading-relaxed">
+            El BH360 (Brand Health 360) es un indice compuesto propietario de Reset / The Lab
+            que integra cinco dimensiones clave de salud de marca en un unico numero accionable
+            de 0 a 100. Fue disenado para resolver un problema comun en marketing: los reportes
+            fragmentados de multiples proveedores que nadie conecta.
+          </p>
+          <p className="text-sm text-zinc-400 leading-relaxed">
+            El indice permite a directores de marketing evaluar de un vistazo si la marca esta
+            mejorando o empeorando, identificar las dimensiones que requieren atencion, y simular
+            escenarios de inversion para optimizar resultados.
+          </p>
+        </section>
+
+        <Separator className="bg-zinc-800" />
+
+        <section id="framework" className="space-y-3">
+          <h2 className="text-xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>Marco Teorico</h2>
+          <p className="text-sm text-zinc-300 leading-relaxed">
+            El BH360 se estructura en tres pilares alineados con ISO 20671 (Brand Evaluation):
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
+            {[
+              { name: "Input", weight: "35%", desc: "Inversion + Alcance. Los recursos que la marca dedica a construir presencia.", color: PILLAR_COLORS.input },
+              { name: "Equity", weight: "40%", desc: "Compra Declarada + Sentiment. La percepcion y disposicion del consumidor.", color: PILLAR_COLORS.equity },
+              { name: "Performance", weight: "25%", desc: "Ventas. El resultado final de negocio.", color: PILLAR_COLORS.performance },
+            ].map((p) => (
+              <Card key={p.name} className="bg-zinc-900/60 border-zinc-800">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
+                    <span className="text-sm font-semibold text-zinc-100">{p.name}</span>
+                    <span className="text-xs font-mono text-zinc-500 ml-auto">{p.weight}</span>
+                  </div>
+                  <p className="text-xs text-zinc-400">{p.desc}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+
+        <Separator className="bg-zinc-800" />
+
+        <section id="dims" className="space-y-3">
+          <h2 className="text-xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>Las 5 Dimensiones</h2>
+          <div className="space-y-4">
+            {DIMENSIONS.map((dim) => (
+              <Card key={dim.id} className="bg-zinc-900/60 border-zinc-800">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <div
+                      className="p-2 rounded mt-0.5"
+                      style={{ backgroundColor: PILLAR_COLORS[dim.pillar] + "20" }}
+                    >
+                      <DimIcon id={dim.id} className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="text-sm font-semibold text-zinc-100">{dim.label}</h3>
+                        <PillarBadge pillar={dim.pillar} />
+                        <span className="text-xs font-mono text-zinc-500 ml-auto">
+                          Peso: {(dim.weight * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                      <p className="text-xs text-zinc-400 mb-2">{dim.description}</p>
+                      <p className="text-xs text-zinc-500">{dim.justification}</p>
+                      <div className="flex gap-4 mt-2 text-xs text-zinc-500">
+                        <span>Piso: <span className="font-mono text-zinc-400">{formatDimensionValue(dim.id, dim.floor)}</span></span>
+                        <span>Techo: <span className="font-mono text-zinc-400">{formatDimensionValue(dim.id, dim.ceiling)}</span></span>
+                        <span>Fuente: <span className="text-zinc-400">{dim.source}</span></span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+
+        <Separator className="bg-zinc-800" />
+
+        <section id="weights" className="space-y-3">
+          <h2 className="text-xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>Pesos y Evidencia</h2>
+          <p className="text-sm text-zinc-300 leading-relaxed">
+            Los pesos fueron calibrados combinando evidencia academica (IPA Databank, Brand Finance)
+            con consideraciones practicas de disponibilidad de datos. La suma total es siempre 1.0.
+          </p>
+          <div className="overflow-x-auto mt-4">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-800">
+                  <th className="text-left py-2 px-2 text-zinc-500">Dimension</th>
+                  <th className="text-right py-2 px-2 text-zinc-500">Peso</th>
+                  <th className="text-left py-2 px-2 text-zinc-500">Fuente clave</th>
+                </tr>
+              </thead>
+              <tbody>
+                {DIMENSIONS.map((d) => (
+                  <tr key={d.id} className="border-b border-zinc-800/50">
+                    <td className="py-2 px-2 text-zinc-300">{d.label}</td>
+                    <td className="py-2 px-2 text-right font-mono text-amber-400">{(d.weight * 100).toFixed(0)}%</td>
+                    <td className="py-2 px-2 text-zinc-400 text-xs">{d.justification.split(".")[0]}.</td>
+                  </tr>
+                ))}
+                <tr className="border-t-2 border-zinc-700">
+                  <td className="py-2 px-2 font-bold text-zinc-100">Total</td>
+                  <td className="py-2 px-2 text-right font-mono font-bold text-amber-400">100%</td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <Separator className="bg-zinc-800" />
+
+        <section id="form" className="space-y-3">
+          <h2 className="text-xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>Formula</h2>
+          <Card className="bg-zinc-900/60 border-zinc-800">
+            <CardContent className="p-4 space-y-4">
+              <div>
+                <h4 className="text-sm font-semibold text-zinc-300 mb-2">Paso 1: Normalizacion Min-Max con Goalposting</h4>
+                <pre className="text-xs font-mono text-zinc-400 bg-zinc-800/50 p-3 rounded overflow-x-auto">
+{`N_i = min(100, max(0, (x_i - Piso_i) / (Techo_i - Piso_i) * 100))
+
+Excepcion para Sentiment (rango -100 a +100):
+N_sentiment = ((NSS + 100) / 200) * 100`}
+                </pre>
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-zinc-300 mb-2">Paso 2: Agregacion Lineal Ponderada</h4>
+                <pre className="text-xs font-mono text-amber-400 bg-zinc-800/50 p-3 rounded overflow-x-auto">
+{`BH360 = 0.15 * N_inv + 0.20 * N_alc + 0.25 * N_com + 0.15 * N_sen + 0.25 * N_ven`}
+                </pre>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+
+        <Separator className="bg-zinc-800" />
+
+        <section id="sensitivity" className="space-y-3">
+          <h2 className="text-xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>Analisis de Sensibilidad</h2>
+          <p className="text-sm text-zinc-300 leading-relaxed">
+            Siguiendo las recomendaciones de la OCDE/JRC (2008) para indices compuestos,
+            se realiza un analisis de sensibilidad para validar la robustez del indice ante
+            variaciones en los pesos. El protocolo consiste en:
+          </p>
+          <ol className="text-sm text-zinc-400 space-y-2 list-decimal list-inside">
+            <li>Generar 1,000 vectores de pesos aleatorios (distribucion Dirichlet)</li>
+            <li>Recalcular el BH360 para cada vector</li>
+            <li>Calcular la correlacion de Spearman entre rankings</li>
+            <li>Si la correlacion media es mayor a 0.90, los pesos son robustos</li>
+          </ol>
+          <p className="text-sm text-zinc-500">
+            Este analisis esta planificado para la version 2.0 con datos historicos reales.
+          </p>
+        </section>
+
+        <Separator className="bg-zinc-800" />
+
+        <section id="roadmap" className="space-y-3">
+          <h2 className="text-xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>Roadmap</h2>
+          <div className="space-y-3">
+            {[
+              { version: "v1.0", label: "Actual", desc: "Mockup funcional para pitch. 4 vistas, data en memoria, calculo BH360 completo." },
+              { version: "v1.1", label: "Post-pitch", desc: "Exportar PDF, responsive mobile, multiples marcas, alertas por umbral." },
+              { version: "v2.0", label: "Produccion", desc: "Backend Supabase, historico con tendencias, Monte Carlo, comparativa entre marcas, importacion Excel/CSV." },
+              { version: "v3.0", label: "Optimizacion", desc: "Pesos data-driven via PCA, benchmarks sectoriales FMCG Peru, integracion con APIs de plataformas." },
+            ].map((r) => (
+              <div key={r.version} className="flex gap-3">
+                <Badge variant="outline" className="border-zinc-700 text-zinc-400 text-xs shrink-0">
+                  {r.version}
+                </Badge>
+                <div>
+                  <span className="text-sm font-semibold text-zinc-200">{r.label}</span>
+                  <p className="text-xs text-zinc-400 mt-0.5">{r.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <Separator className="bg-zinc-800" />
+
+        <section id="refs" className="space-y-3">
+          <h2 className="text-xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>Referencias</h2>
+          <ul className="text-xs text-zinc-400 space-y-2">
+            <li>Binet, L. & Davis, S. (2025). <span className="text-zinc-300">The Cost of Chaos</span>. IPA.</li>
+            <li>Binet, L. & Field, P. (2013). <span className="text-zinc-300">The Long and the Short of It</span>. IPA.</li>
+            <li>Brand Finance (2022). <span className="text-zinc-300">BrandBeta: Predicting Market Share from Brand Perceptions</span>.</li>
+            <li>Field, P. (2026). <span className="text-zinc-300">The Trust Effect</span>. IPA Databank.</li>
+            <li>OECD/JRC (2008). <span className="text-zinc-300">Handbook on Constructing Composite Indicators</span>.</li>
+            <li>ISO 20671:2019. <span className="text-zinc-300">Brand Evaluation — Principles and Fundamentals</span>.</li>
+            <li>Sharp, B. (2010). <span className="text-zinc-300">How Brands Grow</span>. Oxford University Press.</li>
+            <li>Ebiquity/Thinkbox (2024). <span className="text-zinc-300">Profit Ability 2</span>.</li>
+            <li>Saisana, M. et al. (2005). <span className="text-zinc-300">Uncertainty and Sensitivity Analysis for Composite Indicators</span>. JRC.</li>
+          </ul>
+        </section>
+      </div>
+    </div>
+  )
+}
+
+// ─── Main App ─────────────────────────────────────────────────
+
+const NAV_TABS = [
+  { id: "report", label: "Reporte", icon: BarChart3 },
+  { id: "entry", label: "Ingreso", icon: ClipboardList },
+  { id: "sim", label: "Simulador", icon: SlidersHorizontal },
+  { id: "meth", label: "Metodologia", icon: FileText },
+]
+
+export default function App() {
+  const [tab, setTab] = useState("report")
+  const [data, setData] = useState<PeriodData[]>(SAMPLE_DATA)
+  const [selectedIndex, setSelectedIndex] = useState(SAMPLE_DATA.length - 1)
+
+  const handleAddPeriod = (period: PeriodData) => {
+    setData((prev) => {
+      const next = [...prev, period]
+      setSelectedIndex(next.length - 1)
+      return next
+    })
+  }
+
+  return (
+    <TooltipProvider>
+      <div className="min-h-screen bg-zinc-950 flex flex-col">
+        {/* Header */}
+        <header className="sticky top-0 z-50 bg-zinc-950/80 backdrop-blur-sm border-b border-zinc-800">
+          <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl font-bold text-amber-400" style={{ fontFamily: "Outfit" }}>
+                BH360
+              </h1>
+              <span className="text-xs text-zinc-500 hidden sm:inline">Brand Health 360</span>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <Select
+                value={String(selectedIndex)}
+                onValueChange={(v) => setSelectedIndex(Number(v))}
+              >
+                <SelectTrigger className="w-[160px] bg-zinc-900 border-zinc-700 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-zinc-900 border-zinc-700">
+                  {data.map((d, i) => (
+                    <SelectItem key={i} value={String(i)} className="text-sm">
+                      {d.period}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <div className="max-w-7xl mx-auto px-4">
+            <Tabs value={tab} onValueChange={setTab}>
+              <TabsList className="bg-transparent border-b border-zinc-800 rounded-none h-auto p-0 gap-0 w-full justify-start">
+                {NAV_TABS.map((t) => {
+                  const Icon = t.icon
+                  return (
+                    <TabsTrigger
+                      key={t.id}
+                      value={t.id}
+                      aria-current={tab === t.id ? "page" : undefined}
+                      className="rounded-none border-b-2 border-transparent data-[state=active]:border-amber-400 data-[state=active]:text-amber-400 data-[state=active]:bg-transparent px-4 py-2.5 text-sm text-zinc-400 hover:text-zinc-200 transition-colors"
+                    >
+                      <Icon className="h-4 w-4 mr-1.5" />
+                      {t.label}
+                    </TabsTrigger>
+                  )
+                })}
+              </TabsList>
+            </Tabs>
+          </div>
+        </header>
+
+        {/* Main Content */}
+        <main className="flex-1 max-w-7xl mx-auto px-4 py-6 w-full">
+          {tab === "report" && (
+            <ReportView data={data} selectedIndex={selectedIndex} />
+          )}
+          {tab === "entry" && (
+            <DataEntryView data={data} onAddPeriod={handleAddPeriod} />
+          )}
+          {tab === "sim" && (
+            <SimView data={data} selectedIndex={selectedIndex} />
+          )}
+          {tab === "meth" && <MethodView />}
+        </main>
+
+        {/* Footer */}
+        <footer className="border-t border-zinc-800 bg-zinc-950">
+          <div className="max-w-7xl mx-auto px-4 py-4 flex items-center gap-6">
+            <div className="flex items-center gap-4">
+              <img
+                src={resetLogo}
+                alt="Reset"
+                className="h-8 object-contain opacity-70 hover:opacity-100 transition-opacity"
+              />
+              <img
+                src={wantedLogo}
+                alt="Wanted"
+                className="h-8 object-contain opacity-70 hover:opacity-100 transition-opacity"
+              />
+            </div>
+            <Separator orientation="vertical" className="h-6 bg-zinc-800" />
+            <span className="text-xs text-zinc-600">
+              BH360 by The Lab / Reset
+            </span>
+          </div>
+        </footer>
+      </div>
+    </TooltipProvider>
+  )
+}
