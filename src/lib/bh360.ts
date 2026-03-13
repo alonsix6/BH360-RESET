@@ -46,7 +46,7 @@ export interface BH360Result {
 export const DIMENSIONS: DimensionConfig[] = [
   {
     id: "investment",
-    label: "Inversion de Campana",
+    label: "Inversión de Campaña",
     pillar: "input",
     weight: 0.15,
     floor: 0,
@@ -54,9 +54,9 @@ export const DIMENSIONS: DimensionConfig[] = [
     unit: "S/",
     source: "Agencia de medios",
     description:
-      "Inversion total en medios pagados durante el periodo. Incluye TV, digital, OOH, radio y prensa.",
+      "Inversión total en medios pagados durante el período. Incluye TV, digital, OOH, radio y prensa.",
     justification:
-      "Binet & Davis (IPA, 2025): el presupuesto explica el 89% de las variaciones en beneficio. Es el input mas controlable por la marca.",
+      "Binet & Davis (IPA, 2025): el presupuesto explica el 89% de las variaciones en beneficio. Es el input más controlable por la marca.",
   },
   {
     id: "reach",
@@ -68,13 +68,13 @@ export const DIMENSIONS: DimensionConfig[] = [
     unit: "%",
     source: "Agencia + plataformas",
     description:
-      "Porcentaje del universo target alcanzado al menos una vez durante el periodo, deduplicado cross-media.",
+      "Porcentaje del universo target alcanzado al menos una vez durante el período, deduplicado cross-media.",
     justification:
-      "Sharp (2010): mental availability es el driver principal de crecimiento. El reach es su proxy mas directo y medible.",
+      "Sharp (2010): mental availability es el driver principal de crecimiento. El reach es su proxy más directo y medible.",
   },
   {
     id: "purchase",
-    label: "Compra Declarada (Ultimo Mes)",
+    label: "Compra Declarada (Último Mes)",
     pillar: "equity",
     weight: 0.25,
     floor: 0,
@@ -82,9 +82,9 @@ export const DIMENSIONS: DimensionConfig[] = [
     unit: "%",
     source: "Ipsos / Panel digital The Lab",
     description:
-      "Porcentaje de encuestados que declaran haber comprado la marca en el ultimo mes. Medido via panel online o tracking.",
+      "Porcentaje de encuestados que declaran haber comprado la marca en el último mes. Medido vía panel online o tracking.",
     justification:
-      "Brand Finance BrandBeta (2022): familiaridad (65%) + consideracion (35%) explican 80%+ de varianza en market share. Compra declarada es la metrica de equity mas predictiva.",
+      "Brand Finance BrandBeta (2022): familiaridad (65%) + consideración (35%) explican 80%+ de varianza en market share. Compra declarada es la métrica de equity más predictiva.",
   },
   {
     id: "sentiment",
@@ -98,11 +98,11 @@ export const DIMENSIONS: DimensionConfig[] = [
     description:
       "Net Sentiment Score: porcentaje de menciones positivas menos negativas. Rango natural de -100 a +100.",
     justification:
-      "Field (IPA, 2026): 93% de campanas con grandes mejoras en trust reportan efectos de negocio. Peso moderado (15%) porque es volatil y sensible a crisis.",
+      "Field (IPA, 2026): 93% de campañas con grandes mejoras en trust reportan efectos de negocio. Peso moderado (15%) porque es volátil y sensible a crisis.",
   },
   {
     id: "sales",
-    label: "Ventas del Periodo",
+    label: "Ventas del Período",
     pillar: "performance",
     weight: 0.25,
     floor: 0,
@@ -110,7 +110,7 @@ export const DIMENSIONS: DimensionConfig[] = [
     unit: "S/",
     source: "Cliente (ERP)",
     description:
-      "Ventas netas en soles del periodo. Dato provisto por el cliente desde su ERP o reporte financiero.",
+      "Ventas netas en soles del período. Dato provisto por el cliente desde su ERP o reporte financiero.",
     justification:
       "Es el resultado final de negocio. Peso igual al de Compra Declarada (25%) para balancear equity con performance real.",
   },
@@ -137,8 +137,8 @@ export const LEVEL_COLORS: Record<string, string> = {
 }
 
 export const LEVEL_LABELS: Record<string, string> = {
-  critical: "Critica",
-  weak: "Debil",
+  critical: "Crítica",
+  weak: "Débil",
   moderate: "Moderada",
   strong: "Fuerte",
   exceptional: "Excepcional",
@@ -178,7 +178,7 @@ export const SAMPLE_DATA: PeriodData[] = [
   {
     period: "Q2 2026",
     brand: "San Fernando",
-    campaign: "Dia de la Madre + Always On",
+    campaign: "Día de la Madre + Always On",
     investment: 2_350_000,
     reach: 65,
     purchase: 52,
@@ -187,7 +187,7 @@ export const SAMPLE_DATA: PeriodData[] = [
   },
 ]
 
-// ─── Funciones de normalizacion ───────────────────────────────
+// ─── Funciones de normalización ───────────────────────────────
 
 export function normalize(value: number, floor: number, ceiling: number): number {
   return Math.min(100, Math.max(0, ((value - floor) / (ceiling - floor)) * 100))
@@ -197,7 +197,7 @@ export function normalizeNSS(nss: number): number {
   return ((nss + 100) / 200) * 100
 }
 
-// ─── Funcion principal de calculo ─────────────────────────────
+// ─── Función principal de cálculo ─────────────────────────────
 
 export function calculateBH360(data: PeriodData): BH360Result {
   const normalized: NormalizedScores = {
@@ -235,23 +235,23 @@ export function calculateBH360(data: PeriodData): BH360Result {
   if (score <= 30) {
     level = "critical"
     interpretation =
-      "Salud de marca critica. Se requiere intervencion inmediata en multiples dimensiones."
+      "Salud de marca crítica. Se requiere intervención inmediata en múltiples dimensiones."
   } else if (score <= 50) {
     level = "weak"
     interpretation =
-      "Salud de marca debil. Hay oportunidades significativas de mejora en las dimensiones con menor puntaje."
+      "Salud de marca débil. Hay oportunidades significativas de mejora en las dimensiones con menor puntaje."
   } else if (score <= 70) {
     level = "moderate"
     interpretation =
-      "Salud de marca moderada. La marca tiene bases solidas pero puede optimizar dimensiones especificas."
+      "Salud de marca moderada. La marca tiene bases sólidas pero puede optimizar dimensiones específicas."
   } else if (score <= 85) {
     level = "strong"
     interpretation =
-      "Salud de marca fuerte. La marca muestra buen desempeno en la mayoria de dimensiones."
+      "Salud de marca fuerte. La marca muestra buen desempeño en la mayoría de dimensiones."
   } else {
     level = "exceptional"
     interpretation =
-      "Salud de marca excepcional. Desempeno sobresaliente en todas las dimensiones."
+      "Salud de marca excepcional. Desempeño sobresaliente en todas las dimensiones."
   }
 
   return {

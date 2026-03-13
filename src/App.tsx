@@ -255,7 +255,7 @@ function InfoModal({ dim }: { dim: typeof DIMENSIONS[number] }) {
         </DialogHeader>
         <div className="space-y-4 text-sm">
           <div>
-            <span className="text-zinc-500">Definicion</span>
+            <span className="text-zinc-500">Definición</span>
             <p className="text-zinc-300 mt-1">{dim.description}</p>
           </div>
           <Separator className="bg-zinc-700" />
@@ -288,7 +288,7 @@ function InfoModal({ dim }: { dim: typeof DIMENSIONS[number] }) {
           </div>
           <Separator className="bg-zinc-700" />
           <div>
-            <span className="text-zinc-500">Formula de normalizacion</span>
+            <span className="text-zinc-500">Fórmula de normalización</span>
             <p className="text-zinc-300 mt-1 font-mono text-xs">
               {dim.id === "sentiment"
                 ? "N = ((NSS + 100) / 200) * 100"
@@ -337,7 +337,7 @@ function ReportView({
     fill: PILLAR_COLORS[dim.pillar],
   }))
 
-  // Diagnostico automatico
+  // Diagnóstico automático
   const sorted = DIMENSIONS.map((dim) => ({
     ...dim,
     score: result.normalized[dim.id as keyof NormalizedScores],
@@ -500,7 +500,7 @@ function ReportView({
       {/* Waterfall Chart */}
       <Card className="bg-zinc-900/60 border-zinc-800">
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm text-zinc-400">Contribucion por Dimension</CardTitle>
+          <CardTitle className="text-sm text-zinc-400">Contribución por Dimensión</CardTitle>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={200}>
@@ -511,7 +511,7 @@ function ReportView({
                 contentStyle={{ backgroundColor: "#18181b", borderColor: "#3f3f46", borderRadius: 8 }}
                 labelStyle={{ color: "#a1a1aa" }}
                 itemStyle={{ color: "#f4f4f5" }}
-                formatter={(v) => [`${Number(v).toFixed(1)} pts`, "Contribucion"]}
+                formatter={(v) => [`${Number(v).toFixed(1)} pts`, "Contribución"]}
               />
               <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                 {waterfallData.map((entry, i) => (
@@ -529,15 +529,15 @@ function ReportView({
         style={{ borderLeftColor: LEVEL_COLORS[result.level], borderTopColor: "#27272a", borderRightColor: "#27272a", borderBottomColor: "#27272a" }}
       >
         <CardContent className="p-6 space-y-2">
-          <h3 className="text-sm font-semibold text-zinc-100">Diagnostico</h3>
+          <h3 className="text-sm font-semibold text-zinc-100">Diagnóstico</h3>
           <p className="text-sm text-zinc-300">{result.interpretation}</p>
           <p className="text-sm text-zinc-400">
-            La dimension mas fuerte es <strong className="text-zinc-200">{strongest.label}</strong> ({strongest.score.toFixed(0)}/100).
-            La dimension mas debil es <strong className="text-zinc-200">{weakest.label}</strong> ({weakest.score.toFixed(0)}/100).
+            La dimensión más fuerte es <strong className="text-zinc-200">{strongest.label}</strong> ({strongest.score.toFixed(0)}/100).
+            La dimensión más débil es <strong className="text-zinc-200">{weakest.label}</strong> ({weakest.score.toFixed(0)}/100).
           </p>
           {weakest.score < 40 && (
             <p className="text-sm text-amber-400">
-              Se recomienda una intervencion focalizada en {weakest.label} para mejorar el indice general.
+              Se recomienda una intervención focalizada en {weakest.label} para mejorar el índice general.
             </p>
           )}
         </CardContent>
@@ -549,7 +549,7 @@ function ReportView({
 // ─── Data Entry View ──────────────────────────────────────────
 
 const ENTRY_STEPS = [
-  { id: "campaign", label: "Campana", dimId: null },
+  { id: "campaign", label: "Campaña", dimId: null },
   ...DIMENSIONS.map((d) => ({ id: d.id, label: d.label, dimId: d.id })),
 ]
 
@@ -637,7 +637,7 @@ function DataEntryView({
             {step === 0 && (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="period">Periodo</Label>
+                  <Label htmlFor="period">Período</Label>
                   <Input
                     id="period"
                     placeholder="Ej: Q3 2026"
@@ -656,7 +656,7 @@ function DataEntryView({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="campaign">Campana</Label>
+                  <Label htmlFor="campaign">Campaña</Label>
                   <Input
                     id="campaign"
                     placeholder="Ej: Navidad + Pavo"
@@ -692,7 +692,7 @@ function DataEntryView({
                       className="bg-zinc-800 border-zinc-700"
                     />
                     <p className="text-xs text-zinc-500">
-                      Fuente: {dim.source}. Peso en el indice: {(dim.weight * 100).toFixed(0)}%.
+                      Fuente: {dim.source}. Peso en el índice: {(dim.weight * 100).toFixed(0)}%.
                     </p>
                   </div>
                 </div>
@@ -724,7 +724,7 @@ function DataEntryView({
                   onClick={handleSave}
                   className="bg-amber-500 hover:bg-amber-600 text-zinc-900"
                 >
-                  Guardar Periodo
+                  Guardar Período
                 </Button>
               )}
             </div>
@@ -735,15 +735,15 @@ function DataEntryView({
         {data.length > 0 && (
           <Card className="bg-zinc-900/60 border-zinc-800">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-zinc-400">Historico de Periodos</CardTitle>
+              <CardTitle className="text-sm text-zinc-400">Histórico de Períodos</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
                 <table role="table" className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-zinc-800">
-                      <th className="text-left py-2 px-2 text-zinc-500 font-medium">Periodo</th>
-                      <th className="text-left py-2 px-2 text-zinc-500 font-medium">Campana</th>
+                      <th className="text-left py-2 px-2 text-zinc-500 font-medium">Período</th>
+                      <th className="text-left py-2 px-2 text-zinc-500 font-medium">Campaña</th>
                       {DIMENSIONS.map((d) => (
                         <th key={d.id} className="text-right py-2 px-2 text-zinc-500 font-medium">
                           {d.label.split(" ")[0]}
@@ -782,7 +782,7 @@ function DataEntryView({
       <div className="space-y-4">
         <Card className="bg-zinc-900/60 border-zinc-800 sticky top-20">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-zinc-400">Preview en Vivo</CardTitle>
+            <CardTitle className="text-sm text-zinc-400">Vista Previa en Vivo</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col items-center gap-4">
             <ScoreRing score={preview.score} size={140} strokeWidth={10} />
@@ -856,7 +856,7 @@ function SimView({
 
   const presets = [
     {
-      label: "+50% Inversion",
+      label: "+50% Inversión",
       apply: () => {
         const v = Math.min(100, (simValues.investment ?? 0) * 1.5)
         setSimValues((prev) => ({ ...prev, investment: v }))
@@ -1006,11 +1006,11 @@ function SimView({
 
 function MethodView() {
   const sections = [
-    { id: "what", label: "Que es el BH360" },
-    { id: "framework", label: "Marco Teorico" },
+    { id: "what", label: "¿Qué es el BH360?" },
+    { id: "framework", label: "Marco Teórico" },
     { id: "dims", label: "Las 5 Dimensiones" },
     { id: "weights", label: "Pesos y Evidencia" },
-    { id: "form", label: "Formula" },
+    { id: "form", label: "Fórmula" },
     { id: "sensitivity", label: "Sensibilidad" },
     { id: "roadmap", label: "Roadmap" },
     { id: "refs", label: "Referencias" },
@@ -1019,7 +1019,7 @@ function MethodView() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
       {/* Sidebar */}
-      <nav aria-label="Secciones de metodologia" className="hidden lg:block">
+      <nav aria-label="Secciones de metodología" className="hidden lg:block">
         <div className="sticky top-20 space-y-1">
           {sections.map((s) => (
             <a
@@ -1036,31 +1036,31 @@ function MethodView() {
       {/* Content */}
       <div className="lg:col-span-3 space-y-8">
         <section id="what" className="space-y-3">
-          <h2 className="text-xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>Que es el BH360</h2>
+          <h2 className="text-xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>¿Qué es el BH360?</h2>
           <p className="text-sm text-zinc-300 leading-relaxed">
-            El BH360 (Brand Health 360) es un indice compuesto propietario de Reset / The Lab
-            que integra cinco dimensiones clave de salud de marca en un unico numero accionable
-            de 0 a 100. Fue disenado para resolver un problema comun en marketing: los reportes
-            fragmentados de multiples proveedores que nadie conecta.
+            El BH360 (Brand Health 360) es un índice compuesto propietario de Reset / The Lab
+            que integra cinco dimensiones clave de salud de marca en un único número accionable
+            de 0 a 100. Fue diseñado para resolver un problema común en marketing: los reportes
+            fragmentados de múltiples proveedores que nadie conecta.
           </p>
           <p className="text-sm text-zinc-400 leading-relaxed">
-            El indice permite a directores de marketing evaluar de un vistazo si la marca esta
-            mejorando o empeorando, identificar las dimensiones que requieren atencion, y simular
-            escenarios de inversion para optimizar resultados.
+            El índice permite a directores de marketing evaluar de un vistazo si la marca está
+            mejorando o empeorando, identificar las dimensiones que requieren atención, y simular
+            escenarios de inversión para optimizar resultados.
           </p>
         </section>
 
         <Separator className="bg-zinc-800" />
 
         <section id="framework" className="space-y-3">
-          <h2 className="text-xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>Marco Teorico</h2>
+          <h2 className="text-xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>Marco Teórico</h2>
           <p className="text-sm text-zinc-300 leading-relaxed">
             El BH360 se estructura en tres pilares alineados con ISO 20671 (Brand Evaluation):
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
             {[
-              { name: "Input", weight: "35%", desc: "Inversion + Alcance. Los recursos que la marca dedica a construir presencia.", color: PILLAR_COLORS.input },
-              { name: "Equity", weight: "40%", desc: "Compra Declarada + Sentiment. La percepcion y disposicion del consumidor.", color: PILLAR_COLORS.equity },
+              { name: "Input", weight: "35%", desc: "Inversión + Alcance. Los recursos que la marca dedica a construir presencia.", color: PILLAR_COLORS.input },
+              { name: "Equity", weight: "40%", desc: "Compra Declarada + Sentiment. La percepción y disposición del consumidor.", color: PILLAR_COLORS.equity },
               { name: "Performance", weight: "25%", desc: "Ventas. El resultado final de negocio.", color: PILLAR_COLORS.performance },
             ].map((p) => (
               <Card key={p.name} className="bg-zinc-900/60 border-zinc-800">
@@ -1120,14 +1120,14 @@ function MethodView() {
         <section id="weights" className="space-y-3">
           <h2 className="text-xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>Pesos y Evidencia</h2>
           <p className="text-sm text-zinc-300 leading-relaxed">
-            Los pesos fueron calibrados combinando evidencia academica (IPA Databank, Brand Finance)
-            con consideraciones practicas de disponibilidad de datos. La suma total es siempre 1.0.
+            Los pesos fueron calibrados combinando evidencia académica (IPA Databank, Brand Finance)
+            con consideraciones prácticas de disponibilidad de datos. La suma total es siempre 1.0.
           </p>
           <div className="overflow-x-auto mt-4">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-zinc-800">
-                  <th className="text-left py-2 px-2 text-zinc-500">Dimension</th>
+                  <th className="text-left py-2 px-2 text-zinc-500">Dimensión</th>
                   <th className="text-right py-2 px-2 text-zinc-500">Peso</th>
                   <th className="text-left py-2 px-2 text-zinc-500">Fuente clave</th>
                 </tr>
@@ -1153,20 +1153,20 @@ function MethodView() {
         <Separator className="bg-zinc-800" />
 
         <section id="form" className="space-y-3">
-          <h2 className="text-xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>Formula</h2>
+          <h2 className="text-xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>Fórmula</h2>
           <Card className="bg-zinc-900/60 border-zinc-800">
             <CardContent className="p-4 space-y-4">
               <div>
-                <h4 className="text-sm font-semibold text-zinc-300 mb-2">Paso 1: Normalizacion Min-Max con Goalposting</h4>
+                <h4 className="text-sm font-semibold text-zinc-300 mb-2">Paso 1: Normalización Min-Max con Goalposting</h4>
                 <pre className="text-xs font-mono text-zinc-400 bg-zinc-800/50 p-3 rounded overflow-x-auto">
 {`N_i = min(100, max(0, (x_i - Piso_i) / (Techo_i - Piso_i) * 100))
 
-Excepcion para Sentiment (rango -100 a +100):
+Excepción para Sentiment (rango -100 a +100):
 N_sentiment = ((NSS + 100) / 200) * 100`}
                 </pre>
               </div>
               <div>
-                <h4 className="text-sm font-semibold text-zinc-300 mb-2">Paso 2: Agregacion Lineal Ponderada</h4>
+                <h4 className="text-sm font-semibold text-zinc-300 mb-2">Paso 2: Agregación Lineal Ponderada</h4>
                 <pre className="text-xs font-mono text-amber-400 bg-zinc-800/50 p-3 rounded overflow-x-auto">
 {`BH360 = 0.15 * N_inv + 0.20 * N_alc + 0.25 * N_com + 0.15 * N_sen + 0.25 * N_ven`}
                 </pre>
@@ -1178,20 +1178,20 @@ N_sentiment = ((NSS + 100) / 200) * 100`}
         <Separator className="bg-zinc-800" />
 
         <section id="sensitivity" className="space-y-3">
-          <h2 className="text-xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>Analisis de Sensibilidad</h2>
+          <h2 className="text-xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>Análisis de Sensibilidad</h2>
           <p className="text-sm text-zinc-300 leading-relaxed">
-            Siguiendo las recomendaciones de la OCDE/JRC (2008) para indices compuestos,
-            se realiza un analisis de sensibilidad para validar la robustez del indice ante
+            Siguiendo las recomendaciones de la OCDE/JRC (2008) para índices compuestos,
+            se realiza un análisis de sensibilidad para validar la robustez del índice ante
             variaciones en los pesos. El protocolo consiste en:
           </p>
           <ol className="text-sm text-zinc-400 space-y-2 list-decimal list-inside">
-            <li>Generar 1,000 vectores de pesos aleatorios (distribucion Dirichlet)</li>
+            <li>Generar 1,000 vectores de pesos aleatorios (distribución Dirichlet)</li>
             <li>Recalcular el BH360 para cada vector</li>
-            <li>Calcular la correlacion de Spearman entre rankings</li>
-            <li>Si la correlacion media es mayor a 0.90, los pesos son robustos</li>
+            <li>Calcular la correlación de Spearman entre rankings</li>
+            <li>Si la correlación media es mayor a 0.90, los pesos son robustos</li>
           </ol>
           <p className="text-sm text-zinc-500">
-            Este analisis esta planificado para la version 2.0 con datos historicos reales.
+            Este análisis está planificado para la versión 2.0 con datos históricos reales.
           </p>
         </section>
 
@@ -1201,10 +1201,10 @@ N_sentiment = ((NSS + 100) / 200) * 100`}
           <h2 className="text-xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>Roadmap</h2>
           <div className="space-y-3">
             {[
-              { version: "v1.0", label: "Actual", desc: "Mockup funcional para pitch. 4 vistas, data en memoria, calculo BH360 completo." },
-              { version: "v1.1", label: "Post-pitch", desc: "Exportar PDF, responsive mobile, multiples marcas, alertas por umbral." },
-              { version: "v2.0", label: "Produccion", desc: "Backend Supabase, historico con tendencias, Monte Carlo, comparativa entre marcas, importacion Excel/CSV." },
-              { version: "v3.0", label: "Optimizacion", desc: "Pesos data-driven via PCA, benchmarks sectoriales FMCG Peru, integracion con APIs de plataformas." },
+              { version: "v1.0", label: "Actual", desc: "Mockup funcional para pitch. 4 vistas, data en memoria, cálculo BH360 completo." },
+              { version: "v1.1", label: "Post-pitch", desc: "Exportar PDF, responsive mobile, múltiples marcas, alertas por umbral." },
+              { version: "v2.0", label: "Producción", desc: "Backend Supabase, histórico con tendencias, Monte Carlo, comparativa entre marcas, importación Excel/CSV." },
+              { version: "v3.0", label: "Optimización", desc: "Pesos data-driven vía PCA, benchmarks sectoriales FMCG Perú, integración con APIs de plataformas." },
             ].map((r) => (
               <div key={r.version} className="flex gap-3">
                 <Badge variant="outline" className="border-zinc-700 text-zinc-400 text-xs shrink-0">
@@ -1246,7 +1246,7 @@ const NAV_TABS = [
   { id: "report", label: "Reporte", icon: BarChart3 },
   { id: "entry", label: "Ingreso", icon: ClipboardList },
   { id: "sim", label: "Simulador", icon: SlidersHorizontal },
-  { id: "meth", label: "Metodologia", icon: FileText },
+  { id: "meth", label: "Metodología", icon: FileText },
 ]
 
 export default function App() {
