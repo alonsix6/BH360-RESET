@@ -259,41 +259,15 @@ function InfoModal({ dim }: { dim: typeof DIMENSIONS[number] }) {
             <p className="text-zinc-300 mt-1">{dim.description}</p>
           </div>
           <Separator className="bg-zinc-700" />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="flex items-center gap-4">
             <div>
               <span className="text-zinc-500">Pilar</span>
               <div className="mt-1"><PillarBadge pillar={dim.pillar} /></div>
             </div>
             <div>
-              <span className="text-zinc-500">Peso</span>
-              <p className="text-zinc-300 mt-1 font-mono">{(dim.weight * 100).toFixed(0)}%</p>
+              <span className="text-zinc-500">Fuente</span>
+              <p className="text-zinc-300 mt-1">{dim.source}</p>
             </div>
-            <div>
-              <span className="text-zinc-500">Piso</span>
-              <p className="text-zinc-300 mt-1 font-mono">{formatDimensionValue(dim.id, dim.floor)}</p>
-            </div>
-            <div>
-              <span className="text-zinc-500">Techo</span>
-              <p className="text-zinc-300 mt-1 font-mono">{formatDimensionValue(dim.id, dim.ceiling)}</p>
-            </div>
-          </div>
-          <Separator className="bg-zinc-700" />
-          <div>
-            <span className="text-zinc-500">Fuente</span>
-            <p className="text-zinc-300 mt-1">{dim.source}</p>
-          </div>
-          <div>
-            <span className="text-zinc-500">Sustento</span>
-            <p className="text-zinc-300 mt-1">{dim.justification}</p>
-          </div>
-          <Separator className="bg-zinc-700" />
-          <div>
-            <span className="text-zinc-500">Fórmula de normalización</span>
-            <p className="text-zinc-300 mt-1 font-mono text-xs">
-              {dim.id === "sentiment"
-                ? "N = ((NSS + 100) / 200) * 100"
-                : `N = min(100, max(0, (x - ${dim.floor}) / (${dim.ceiling} - ${dim.floor}) * 100))`}
-            </p>
           </div>
         </div>
       </DialogContent>
@@ -331,9 +305,9 @@ function ReportView({
       : undefined,
   }))
 
-  const waterfallData = DIMENSIONS.map((dim) => ({
+  const barData = DIMENSIONS.map((dim) => ({
     name: dim.label.split(" ")[0],
-    value: Math.round(result.contributions[dim.id] * 10) / 10,
+    value: Math.round(result.normalized[dim.id as keyof NormalizedScores]),
     fill: PILLAR_COLORS[dim.pillar],
   }))
 
@@ -486,9 +460,6 @@ function ReportView({
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <PillarBadge pillar={dim.pillar} />
-                    <span className="text-zinc-500 font-mono">
-                      +{result.contributions[dim.id].toFixed(1)} pts
-                    </span>
                   </div>
                 </CardContent>
               </Card>
@@ -500,21 +471,21 @@ function ReportView({
       {/* Waterfall Chart */}
       <Card className="bg-zinc-900/60 border-zinc-800">
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm text-zinc-400">Contribución por Dimensión</CardTitle>
+          <CardTitle className="text-sm text-zinc-400">Score por Dimensión</CardTitle>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={waterfallData} barCategoryGap="20%">
+            <BarChart data={barData} barCategoryGap="20%">
               <XAxis dataKey="name" tick={{ fill: "#a1a1aa", fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: "#71717a", fontSize: 10 }} axisLine={false} tickLine={false} />
+              <YAxis domain={[0, 100]} tick={{ fill: "#71717a", fontSize: 10 }} axisLine={false} tickLine={false} />
               <RechartsTooltip
                 contentStyle={{ backgroundColor: "#18181b", borderColor: "#3f3f46", borderRadius: 8 }}
                 labelStyle={{ color: "#a1a1aa" }}
                 itemStyle={{ color: "#f4f4f5" }}
-                formatter={(v) => [`${Number(v).toFixed(1)} pts`, "Contribución"]}
+                formatter={(v) => [`${Number(v).toFixed(0)} / 100`, "Score"]}
               />
               <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                {waterfallData.map((entry, i) => (
+                {barData.map((entry, i) => (
                   <Cell key={i} fill={entry.fill} />
                 ))}
               </Bar>
@@ -692,7 +663,7 @@ function DataEntryView({
                       className="bg-zinc-800 border-zinc-700"
                     />
                     <p className="text-xs text-zinc-500">
-                      Fuente: {dim.source}. Peso en el índice: {(dim.weight * 100).toFixed(0)}%.
+                      Fuente: {dim.source}
                     </p>
                   </div>
                 </div>
@@ -1007,13 +978,11 @@ function SimView({
 function MethodView() {
   const sections = [
     { id: "what", label: "¿Qué es el BH360?" },
-    { id: "framework", label: "Marco Teórico" },
+    { id: "problem", label: "¿Qué problema resuelve?" },
+    { id: "framework", label: "Los 3 Pilares" },
     { id: "dims", label: "Las 5 Dimensiones" },
-    { id: "weights", label: "Pesos y Evidencia" },
-    { id: "form", label: "Fórmula" },
-    { id: "sensitivity", label: "Sensibilidad" },
-    { id: "roadmap", label: "Roadmap" },
-    { id: "refs", label: "Referencias" },
+    { id: "how", label: "¿Cómo funciona?" },
+    { id: "levels", label: "Niveles de Salud" },
   ]
 
   return (
@@ -1040,35 +1009,64 @@ function MethodView() {
           <p className="text-sm text-zinc-300 leading-relaxed">
             El BH360 (Business Health 360) es un índice compuesto propietario de Reset / The Lab
             que integra cinco dimensiones clave de salud de negocio en un único número accionable
-            de 0 a 100. Fue diseñado para resolver un problema común en marketing: los reportes
-            fragmentados de múltiples proveedores que nadie conecta.
+            de 0 a 100.
           </p>
           <p className="text-sm text-zinc-400 leading-relaxed">
-            El índice permite a directores de marketing evaluar de un vistazo si la marca está
-            mejorando o empeorando, identificar las dimensiones que requieren atención, y simular
-            escenarios de inversión para optimizar resultados.
+            Permite a directores de marketing evaluar de un vistazo si el negocio está
+            mejorando o empeorando, identificar qué dimensiones requieren atención, y simular
+            escenarios para optimizar resultados.
           </p>
         </section>
 
         <Separator className="bg-zinc-800" />
 
+        <section id="problem" className="space-y-3">
+          <h2 className="text-xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>¿Qué problema resuelve?</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Card className="bg-zinc-900/60 border-zinc-800 border-l-4 border-l-red-500/50">
+              <CardContent className="p-4">
+                <h4 className="text-sm font-semibold text-red-400 mb-2">Sin BH360</h4>
+                <ul className="text-xs text-zinc-400 space-y-1.5">
+                  <li>Reportes fragmentados de múltiples proveedores</li>
+                  <li>Cada proveedor mide lo suyo, nadie conecta las piezas</li>
+                  <li>No hay un número único para evaluar la salud del negocio</li>
+                  <li>Decisiones basadas en métricas aisladas</li>
+                </ul>
+              </CardContent>
+            </Card>
+            <Card className="bg-zinc-900/60 border-zinc-800 border-l-4 border-l-emerald-500/50">
+              <CardContent className="p-4">
+                <h4 className="text-sm font-semibold text-emerald-400 mb-2">Con BH360</h4>
+                <ul className="text-xs text-zinc-400 space-y-1.5">
+                  <li>Una sola vista integrada de salud de negocio</li>
+                  <li>Cinco dimensiones conectadas en un índice de 0 a 100</li>
+                  <li>Diagnóstico automático con fortalezas y debilidades</li>
+                  <li>Simulador para evaluar escenarios antes de invertir</li>
+                </ul>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+        <Separator className="bg-zinc-800" />
+
         <section id="framework" className="space-y-3">
-          <h2 className="text-xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>Marco Teórico</h2>
+          <h2 className="text-xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>Los 3 Pilares</h2>
           <p className="text-sm text-zinc-300 leading-relaxed">
-            El BH360 se estructura en tres pilares alineados con ISO 20671 (Brand Evaluation):
+            El BH360 organiza sus dimensiones en tres pilares alineados con estándares
+            internacionales de evaluación de marca:
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
             {[
-              { name: "Input", weight: "35%", desc: "Inversión + Alcance. Los recursos que la marca dedica a construir presencia.", color: PILLAR_COLORS.input },
-              { name: "Equity", weight: "40%", desc: "Compra Declarada + Sentiment. La percepción y disposición del consumidor.", color: PILLAR_COLORS.equity },
-              { name: "Performance", weight: "25%", desc: "Ventas. El resultado final de negocio.", color: PILLAR_COLORS.performance },
+              { name: "Input", desc: "Los recursos que el negocio dedica a construir presencia en el mercado.", color: PILLAR_COLORS.input },
+              { name: "Equity", desc: "La percepción y disposición del consumidor hacia la marca.", color: PILLAR_COLORS.equity },
+              { name: "Performance", desc: "El resultado final de negocio medido en ventas.", color: PILLAR_COLORS.performance },
             ].map((p) => (
               <Card key={p.name} className="bg-zinc-900/60 border-zinc-800">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
                     <span className="text-sm font-semibold text-zinc-100">{p.name}</span>
-                    <span className="text-xs font-mono text-zinc-500 ml-auto">{p.weight}</span>
                   </div>
                   <p className="text-xs text-zinc-400">{p.desc}</p>
                 </CardContent>
@@ -1081,6 +1079,10 @@ function MethodView() {
 
         <section id="dims" className="space-y-3">
           <h2 className="text-xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>Las 5 Dimensiones</h2>
+          <p className="text-sm text-zinc-400 leading-relaxed mb-4">
+            Cada dimensión captura un aspecto fundamental de la salud del negocio,
+            desde la inversión hasta el resultado en ventas.
+          </p>
           <div className="space-y-4">
             {DIMENSIONS.map((dim) => (
               <Card key={dim.id} className="bg-zinc-900/60 border-zinc-800">
@@ -1096,17 +1098,9 @@ function MethodView() {
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="text-sm font-semibold text-zinc-100">{dim.label}</h3>
                         <PillarBadge pillar={dim.pillar} />
-                        <span className="text-xs font-mono text-zinc-500 ml-auto">
-                          Peso: {(dim.weight * 100).toFixed(0)}%
-                        </span>
                       </div>
                       <p className="text-xs text-zinc-400 mb-2">{dim.description}</p>
-                      <p className="text-xs text-zinc-500">{dim.justification}</p>
-                      <div className="flex gap-4 mt-2 text-xs text-zinc-500">
-                        <span>Piso: <span className="font-mono text-zinc-400">{formatDimensionValue(dim.id, dim.floor)}</span></span>
-                        <span>Techo: <span className="font-mono text-zinc-400">{formatDimensionValue(dim.id, dim.ceiling)}</span></span>
-                        <span>Fuente: <span className="text-zinc-400">{dim.source}</span></span>
-                      </div>
+                      <span className="text-xs text-zinc-500">Fuente: {dim.source}</span>
                     </div>
                   </div>
                 </CardContent>
@@ -1117,102 +1111,22 @@ function MethodView() {
 
         <Separator className="bg-zinc-800" />
 
-        <section id="weights" className="space-y-3">
-          <h2 className="text-xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>Pesos y Evidencia</h2>
-          <p className="text-sm text-zinc-300 leading-relaxed">
-            Los pesos fueron calibrados combinando evidencia académica (IPA Databank, Brand Finance)
-            con consideraciones prácticas de disponibilidad de datos. La suma total es siempre 1.0.
-          </p>
-          <div className="overflow-x-auto mt-4">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-zinc-800">
-                  <th className="text-left py-2 px-2 text-zinc-500">Dimensión</th>
-                  <th className="text-right py-2 px-2 text-zinc-500">Peso</th>
-                  <th className="text-left py-2 px-2 text-zinc-500">Fuente clave</th>
-                </tr>
-              </thead>
-              <tbody>
-                {DIMENSIONS.map((d) => (
-                  <tr key={d.id} className="border-b border-zinc-800/50">
-                    <td className="py-2 px-2 text-zinc-300">{d.label}</td>
-                    <td className="py-2 px-2 text-right font-mono text-amber-400">{(d.weight * 100).toFixed(0)}%</td>
-                    <td className="py-2 px-2 text-zinc-400 text-xs">{d.justification.split(".")[0]}.</td>
-                  </tr>
-                ))}
-                <tr className="border-t-2 border-zinc-700">
-                  <td className="py-2 px-2 font-bold text-zinc-100">Total</td>
-                  <td className="py-2 px-2 text-right font-mono font-bold text-amber-400">100%</td>
-                  <td></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <Separator className="bg-zinc-800" />
-
-        <section id="form" className="space-y-3">
-          <h2 className="text-xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>Fórmula</h2>
-          <Card className="bg-zinc-900/60 border-zinc-800">
-            <CardContent className="p-4 space-y-4">
-              <div>
-                <h4 className="text-sm font-semibold text-zinc-300 mb-2">Paso 1: Normalización Min-Max con Goalposting</h4>
-                <pre className="text-xs font-mono text-zinc-400 bg-zinc-800/50 p-3 rounded overflow-x-auto">
-{`N_i = min(100, max(0, (x_i - Piso_i) / (Techo_i - Piso_i) * 100))
-
-Excepción para Sentiment (rango -100 a +100):
-N_sentiment = ((NSS + 100) / 200) * 100`}
-                </pre>
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold text-zinc-300 mb-2">Paso 2: Agregación Lineal Ponderada</h4>
-                <pre className="text-xs font-mono text-amber-400 bg-zinc-800/50 p-3 rounded overflow-x-auto">
-{`BH360 = 0.15 * N_inv + 0.20 * N_alc + 0.25 * N_com + 0.15 * N_sen + 0.25 * N_ven`}
-                </pre>
-              </div>
-            </CardContent>
-          </Card>
-        </section>
-
-        <Separator className="bg-zinc-800" />
-
-        <section id="sensitivity" className="space-y-3">
-          <h2 className="text-xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>Análisis de Sensibilidad</h2>
-          <p className="text-sm text-zinc-300 leading-relaxed">
-            Siguiendo las recomendaciones de la OCDE/JRC (2008) para índices compuestos,
-            se realiza un análisis de sensibilidad para validar la robustez del índice ante
-            variaciones en los pesos. El protocolo consiste en:
-          </p>
-          <ol className="text-sm text-zinc-400 space-y-2 list-decimal list-inside">
-            <li>Generar 1,000 vectores de pesos aleatorios (distribución Dirichlet)</li>
-            <li>Recalcular el BH360 para cada vector</li>
-            <li>Calcular la correlación de Spearman entre rankings</li>
-            <li>Si la correlación media es mayor a 0.90, los pesos son robustos</li>
-          </ol>
-          <p className="text-sm text-zinc-500">
-            Este análisis está planificado para la versión 2.0 con datos históricos reales.
-          </p>
-        </section>
-
-        <Separator className="bg-zinc-800" />
-
-        <section id="roadmap" className="space-y-3">
-          <h2 className="text-xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>Roadmap</h2>
-          <div className="space-y-3">
+        <section id="how" className="space-y-3">
+          <h2 className="text-xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>¿Cómo funciona?</h2>
+          <div className="space-y-4">
             {[
-              { version: "v1.0", label: "Actual", desc: "Mockup funcional para pitch. 4 vistas, data en memoria, cálculo BH360 completo." },
-              { version: "v1.1", label: "Post-pitch", desc: "Exportar PDF, responsive mobile, múltiples marcas, alertas por umbral." },
-              { version: "v2.0", label: "Producción", desc: "Backend Supabase, histórico con tendencias, Monte Carlo, comparativa entre marcas, importación Excel/CSV." },
-              { version: "v3.0", label: "Optimización", desc: "Pesos data-driven vía PCA, benchmarks sectoriales FMCG Perú, integración con APIs de plataformas." },
-            ].map((r) => (
-              <div key={r.version} className="flex gap-3">
-                <Badge variant="outline" className="border-zinc-700 text-zinc-400 text-xs shrink-0">
-                  {r.version}
-                </Badge>
+              { step: "1", title: "Recopilar", desc: "Se ingresan los valores reales de cada dimensión por período: inversión, alcance, compra declarada, sentiment y ventas." },
+              { step: "2", title: "Normalizar", desc: "Cada dimensión se transforma a una escala comparable de 0 a 100, utilizando rangos de referencia calibrados por categoría." },
+              { step: "3", title: "Ponderar", desc: "Las dimensiones se combinan según su importancia relativa, respaldada por evidencia académica y estándares internacionales." },
+              { step: "4", title: "Diagnosticar", desc: "El sistema genera automáticamente un diagnóstico que identifica fortalezas, debilidades y recomendaciones de acción." },
+            ].map((s) => (
+              <div key={s.step} className="flex gap-3">
+                <span className="w-7 h-7 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-xs font-mono font-bold shrink-0">
+                  {s.step}
+                </span>
                 <div>
-                  <span className="text-sm font-semibold text-zinc-200">{r.label}</span>
-                  <p className="text-xs text-zinc-400 mt-0.5">{r.desc}</p>
+                  <span className="text-sm font-semibold text-zinc-200">{s.title}</span>
+                  <p className="text-xs text-zinc-400 mt-0.5">{s.desc}</p>
                 </div>
               </div>
             ))}
@@ -1221,19 +1135,27 @@ N_sentiment = ((NSS + 100) / 200) * 100`}
 
         <Separator className="bg-zinc-800" />
 
-        <section id="refs" className="space-y-3">
-          <h2 className="text-xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>Referencias</h2>
-          <ul className="text-xs text-zinc-400 space-y-2">
-            <li>Binet, L. & Davis, S. (2025). <span className="text-zinc-300">The Cost of Chaos</span>. IPA.</li>
-            <li>Binet, L. & Field, P. (2013). <span className="text-zinc-300">The Long and the Short of It</span>. IPA.</li>
-            <li>Brand Finance (2022). <span className="text-zinc-300">BrandBeta: Predicting Market Share from Brand Perceptions</span>.</li>
-            <li>Field, P. (2026). <span className="text-zinc-300">The Trust Effect</span>. IPA Databank.</li>
-            <li>OECD/JRC (2008). <span className="text-zinc-300">Handbook on Constructing Composite Indicators</span>.</li>
-            <li>ISO 20671:2019. <span className="text-zinc-300">Brand Evaluation — Principles and Fundamentals</span>.</li>
-            <li>Sharp, B. (2010). <span className="text-zinc-300">How Brands Grow</span>. Oxford University Press.</li>
-            <li>Ebiquity/Thinkbox (2024). <span className="text-zinc-300">Profit Ability 2</span>.</li>
-            <li>Saisana, M. et al. (2005). <span className="text-zinc-300">Uncertainty and Sensitivity Analysis for Composite Indicators</span>. JRC.</li>
-          </ul>
+        <section id="levels" className="space-y-3">
+          <h2 className="text-xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>Niveles de Salud</h2>
+          <p className="text-sm text-zinc-400 leading-relaxed mb-4">
+            El puntaje BH360 se traduce en un nivel cualitativo que facilita
+            la comunicación ejecutiva y la toma de decisiones.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
+            {Object.entries(LEVEL_LABELS).map(([key, label]) => (
+              <Card key={key} className="bg-zinc-900/60 border-zinc-800">
+                <CardContent className="p-3 flex flex-col items-center gap-2">
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: LEVEL_COLORS[key] }}
+                  />
+                  <span className="text-sm font-semibold" style={{ color: LEVEL_COLORS[key] }}>
+                    {label}
+                  </span>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </section>
       </div>
     </div>
