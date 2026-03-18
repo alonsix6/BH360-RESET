@@ -149,41 +149,41 @@ export const SAMPLE_DATA: PeriodData[] = [
     period: "Q3 2025",
     brand: "San Fernando",
     campaign: "Jueves de Pavita + Always On",
-    investment: 1_850_000,
-    reach: 58,
-    purchase: 42,
-    sentiment: 35,
-    sales: 7_200_000,
+    investment: 3_500_000,
+    reach: 68,
+    purchase: 55,
+    sentiment: 45,
+    sales: 8_200_000,
   },
   {
     period: "Q4 2025",
     brand: "San Fernando",
     campaign: "Navidad + Pavo",
-    investment: 3_200_000,
-    reach: 74,
-    purchase: 61,
-    sentiment: 52,
-    sales: 9_800_000,
+    investment: 4_800_000,
+    reach: 78,
+    purchase: 65,
+    sentiment: 58,
+    sales: 10_200_000,
   },
   {
     period: "Q1 2026",
     brand: "San Fernando",
     campaign: "Verano + Embutidos",
-    investment: 2_100_000,
-    reach: 62,
-    purchase: 48,
-    sentiment: 41,
-    sales: 6_900_000,
+    investment: 3_800_000,
+    reach: 77,
+    purchase: 61,
+    sentiment: 52,
+    sales: 9_000_000,
   },
   {
     period: "Q2 2026",
     brand: "San Fernando",
     campaign: "Día de la Madre + Always On",
-    investment: 2_350_000,
-    reach: 65,
-    purchase: 52,
-    sentiment: 45,
-    sales: 7_500_000,
+    investment: 6_800_000,
+    reach: 89,
+    purchase: 79,
+    sentiment: 75,
+    sales: 11_500_000,
   },
 ]
 
@@ -235,23 +235,23 @@ export function calculateBH360(data: PeriodData): BH360Result {
   if (score <= 30) {
     level = "critical"
     interpretation =
-      "Salud de marca crítica. Se requiere intervención inmediata en múltiples dimensiones."
+      "Salud de negocio crítica. Se requiere intervención inmediata en múltiples dimensiones."
   } else if (score <= 50) {
     level = "weak"
     interpretation =
-      "Salud de marca débil. Hay oportunidades significativas de mejora en las dimensiones con menor puntaje."
+      "Salud de negocio débil. Hay oportunidades significativas de mejora en las dimensiones con menor puntaje."
   } else if (score <= 70) {
     level = "moderate"
     interpretation =
-      "Salud de marca moderada. La marca tiene bases sólidas pero puede optimizar dimensiones específicas."
+      "Salud de negocio moderada. La marca tiene bases sólidas pero puede optimizar dimensiones específicas."
   } else if (score <= 85) {
     level = "strong"
     interpretation =
-      "Salud de marca fuerte. La marca muestra buen desempeño en la mayoría de dimensiones."
+      "Salud de negocio fuerte. La marca muestra buen desempeño en la mayoría de dimensiones."
   } else {
     level = "exceptional"
     interpretation =
-      "Salud de marca excepcional. Desempeño sobresaliente en todas las dimensiones."
+      "Salud de negocio excepcional. Desempeño sobresaliente en todas las dimensiones."
   }
 
   return {

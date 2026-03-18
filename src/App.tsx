@@ -1038,8 +1038,8 @@ function MethodView() {
         <section id="what" className="space-y-3">
           <h2 className="text-xl font-bold text-zinc-100" style={{ fontFamily: "Outfit" }}>¿Qué es el BH360?</h2>
           <p className="text-sm text-zinc-300 leading-relaxed">
-            El BH360 (Brand Health 360) es un índice compuesto propietario de Reset / The Lab
-            que integra cinco dimensiones clave de salud de marca en un único número accionable
+            El BH360 (Business Health 360) es un índice compuesto propietario de Reset / The Lab
+            que integra cinco dimensiones clave de salud de negocio en un único número accionable
             de 0 a 100. Fue diseñado para resolver un problema común en marketing: los reportes
             fragmentados de múltiples proveedores que nadie conecta.
           </p>
@@ -1272,7 +1272,13 @@ export default function App() {
               <h1 className="text-xl font-bold text-amber-400" style={{ fontFamily: "Outfit" }}>
                 BH360
               </h1>
-              <span className="text-xs text-zinc-500 hidden sm:inline">Brand Health 360</span>
+              <span className="text-xs text-zinc-500 hidden sm:inline">Business Health 360</span>
+              <Badge
+                variant="outline"
+                className="text-[10px] border-amber-500/50 text-amber-400 bg-amber-500/10 ml-2"
+              >
+                Data de prueba
+              </Badge>
             </div>
 
             <div className="flex items-center gap-4">
