@@ -1,25 +1,23 @@
-# BH360 — Brand Health 360 by The Lab
+# BH360 — Business Health 360 by The Lab
 
-Indice compuesto de salud de marca (0-100) que integra inversion, alcance, compra declarada, sentiment y ventas en un unico numero accionable. Herramienta propietaria de Reset / The Lab para la evaluacion integral de efectividad de marca en FMCG.
+Indice compuesto de salud de negocio (0-100) que integra inversion, alcance, compra declarada, sentiment y ventas en un unico numero accionable. Herramienta propietaria de Reset / The Lab para la evaluacion integral de efectividad de negocio en FMCG.
+
+> **Metodologia tecnica**: Formulas, pesos, goalposts y referencias academicas estan documentados en [`METHODOLOGY.md`](./METHODOLOGY.md) (documento interno, no expuesto en el frontend).
 
 ---
 
 ## Tabla de contenidos
 
 - [Contexto de negocio](#contexto-de-negocio)
-- [Arquitectura del indice](#arquitectura-del-indice)
 - [Stack tecnico](#stack-tecnico)
 - [Estructura del proyecto](#estructura-del-proyecto)
 - [Archivos clave y responsabilidades](#archivos-clave-y-responsabilidades)
-- [Motor de calculo](#motor-de-calculo)
 - [Vistas de la aplicacion](#vistas-de-la-aplicacion)
 - [Sistema de diseno](#sistema-de-diseno)
 - [Datos de ejemplo](#datos-de-ejemplo)
 - [Desarrollo local](#desarrollo-local)
 - [Build y bundle](#build-y-bundle)
 - [Como modificar](#como-modificar)
-- [Roadmap de producto](#roadmap-de-producto)
-- [Sustento metodologico](#sustento-metodologico)
 - [Convenciones y reglas](#convenciones-y-reglas)
 
 ---
@@ -31,57 +29,6 @@ Reset es una agencia de medios 360 en Lima, Peru. The Lab es su unidad de data y
 El problema que resuelve: los directores de marketing reciben reportes fragmentados de la agencia de medios (alcance, CPM), la agencia creativa (engagement, sentiment), la investigadora (brand tracking) y su propio equipo (ventas). Nadie conecta las piezas. El BH360 integra todo en un diagnostico unico.
 
 El cliente piloto es San Fernando, pero la herramienta debe ser replicable para cualquier marca FMCG.
-
----
-
-## Arquitectura del indice
-
-### Los 3 pilares (alineados a ISO 20671)
-
-| Pilar | Peso total | Dimensiones que contiene |
-|-------|-----------|--------------------------|
-| Input | 35% | Inversion (15%) + Alcance (20%) |
-| Equity | 40% | Compra Declarada (25%) + Sentiment (15%) |
-| Performance | 25% | Ventas (25%) |
-
-### Las 5 dimensiones
-
-| ID | Dimension | Peso | Piso | Techo | Unidad | Fuente |
-|----|-----------|------|------|-------|--------|--------|
-| `investment` | Inversion de Campana | 0.15 | 0 | 8,000,000 | S/ | Agencia de medios |
-| `reach` | Alcance Deduplicado | 0.20 | 0 | 95 | % | Agencia + plataformas |
-| `purchase` | Compra Declarada (Ultimo Mes) | 0.25 | 0 | 85 | % | Ipsos / Panel digital The Lab |
-| `sentiment` | Net Sentiment Score | 0.15 | -100 | +100 | NSS | Agencia creativa / Social listening |
-| `sales` | Ventas del Periodo | 0.25 | 0 | 12,000,000 | S/ | Cliente (ERP) |
-
-### Formula
-
-**Paso 1 — Normalizacion Min-Max con goalposting:**
-
-```
-N_i = min(100, max(0, (x_i - Piso_i) / (Techo_i - Piso_i) * 100))
-```
-
-Excepcion para Sentiment (rango natural -100 a +100):
-```
-N_sentiment = ((NSS + 100) / 200) * 100
-```
-
-**Paso 2 — Agregacion lineal ponderada:**
-
-```
-BH360 = 0.15 * N_inv + 0.20 * N_alc + 0.25 * N_com + 0.15 * N_sen + 0.25 * N_ven
-```
-
-### Escala interpretativa
-
-| Rango | Nivel | Variable `level` | Color |
-|-------|-------|-------------------|-------|
-| 0-30 | Critica | `critical` | `#ef4444` |
-| 31-50 | Debil | `weak` | `#f97316` |
-| 51-70 | Moderada | `moderate` | `#eab308` |
-| 71-85 | Fuerte | `strong` | `#22c55e` |
-| 86-100 | Excepcional | `exceptional` | `#06b6d4` |
 
 ---
 
@@ -199,7 +146,7 @@ Contiene todas las vistas en un solo archivo. Estructura interna:
 - `ReportView` — Vista ejecutiva con score, radar, cards dimensionales, waterfall, diagnostico
 - `DataEntryView` — Formulario stepper de 6 pasos con preview en vivo
 - `SimView` — Simulador what-if con 5 sliders y escenarios preconfigurados
-- `MethodView` — Pagina tipo whitepaper con sustento metodologico completo
+- `MethodView` — Pagina explicativa del sistema (sin revelar formulas ni pesos)
 
 **Componente raiz (exportado como default):**
 - `App` — Shell con header sticky, navegacion por tabs, selector de periodo, y renderizado condicional de la vista activa
@@ -214,47 +161,6 @@ Define las CSS variables de shadcn/ui. El tema actual es **dark by default** (no
 --border: 0 0% 14%;           /* zinc-800 */
 --radius: 0.5rem;
 ```
-
----
-
-## Motor de calculo
-
-### Flujo de datos
-
-```
-PeriodData (valores crudos)
-  |
-  v
-normalize() / normalizeNSS()
-  |
-  v
-NormalizedScores (0-100 por dimension)
-  |
-  v
-contributions = normalized[i] * weight[i]
-  |
-  v
-BH360 score = sum(contributions)
-  |
-  v
-BH360Result { score, normalized, contributions, pillarScores, level, interpretation }
-```
-
-### Calculo de pillarScores
-
-Los pillar scores son el promedio ponderado de las dimensiones normalizadas dentro de cada pilar:
-
-```
-inputAvg = (N_inv * 0.15 + N_alc * 0.20) / (0.15 + 0.20)
-equityAvg = (N_com * 0.25 + N_sen * 0.15) / (0.25 + 0.15)
-performanceAvg = N_ven
-```
-
-Estos se usan para las barras de progreso por pilar en la vista de Reporte.
-
-### Diagnostico automatico
-
-La funcion de diagnostico en `ReportView` ordena las 5 dimensiones por score normalizado, identifica la mas fuerte y la mas debil, calcula el delta vs periodo anterior, y genera un parrafo narrativo. Si la dimension mas debil esta por debajo de 40/100, agrega una recomendacion de intervencion.
 
 ---
 
@@ -294,11 +200,9 @@ Vista what-if para planificacion estrategica.
 
 ### 4. Metodologia (`tab === 'meth'`)
 
-Pagina tipo whitepaper con navegacion lateral sticky.
+Pagina explicativa con navegacion lateral sticky. Explica que es el BH360, que problema resuelve, los 3 pilares, las 5 dimensiones (sin pesos ni goalposts), como funciona a alto nivel, y los niveles de salud.
 
-Secciones: Que es el BH360 → Marco teorico → 5 dimensiones → Pesos y evidencia → Formula → Sensibilidad → Roadmap → Referencias
-
-Contenido basado en la investigacion de Deep Research (IPA Databank, Binet & Field, Brand Finance BrandBeta, OCDE Handbook, ISO 20671, Sharp/Ehrenberg-Bass).
+**IMPORTANTE**: Esta vista NO revela formulas, pesos exactos, goalposts ni referencias academicas. La metodologia tecnica completa esta en `METHODOLOGY.md`.
 
 ---
 
@@ -371,16 +275,7 @@ Pendiente para v2:
 
 ## Datos de ejemplo
 
-El array `SAMPLE_DATA` en `bh360.ts` contiene 4 periodos de San Fernando:
-
-| Periodo | Campana | Inversion | Reach | Compra | NSS | Ventas | BH360 aprox |
-|---------|---------|-----------|-------|--------|-----|--------|-------------|
-| Q3 2025 | Jueves de Pavita + Always On | S/ 1.85M | 58% | 42% | +35 | S/ 7.2M | ~47 |
-| Q4 2025 | Navidad + Pavo | S/ 3.2M | 74% | 61% | +52 | S/ 9.8M | ~66 |
-| Q1 2026 | Verano + Embutidos | S/ 2.1M | 62% | 48% | +41 | S/ 6.9M | ~51 |
-| Q2 2026 | Dia de la Madre + Always On | S/ 2.35M | 65% | 52% | +45 | S/ 7.5M | ~55 |
-
-Estos datos son ficticios pero calibrados para ser realistas dado el contexto de San Fernando (~S/ 6M anuales de inversion, lider en proteina animal en Peru).
+El array `SAMPLE_DATA` en `bh360.ts` contiene 4 periodos de ejemplo de San Fernando. Estos datos son ficticios (la app muestra un badge "Data de prueba") pero calibrados para ser realistas dado el contexto FMCG Peru. La trayectoria es ascendente, con el Q2 2026 alcanzando nivel excepcional (90+).
 
 ---
 
@@ -429,7 +324,7 @@ pnpm build      # Output en dist/
 2. En el array `DIMENSIONS`, modificar el campo `weight` de cada dimension
 3. Verificar que la suma de los 5 `weight` sea exactamente `1.0`
 4. Actualizar el campo `justification` si la razon del peso cambio
-5. Actualizar la formula textual en la vista de Metodologia (`MethodView` en `App.tsx`, seccion `id="form"`)
+5. Actualizar `METHODOLOGY.md` con los nuevos pesos
 
 ### Cambiar los goalposts (pisos y techos)
 
@@ -451,7 +346,7 @@ pnpm build      # Output en dist/
    - Agregar el caso en `DimIcon` para el nuevo `id`
    - El resto de la UI se adapta automaticamente porque itera sobre `DIMENSIONS`
    - Agregar un nuevo paso en el stepper de `DataEntryView`
-   - Actualizar la formula textual en `MethodView`
+   - Actualizar `METHODOLOGY.md`
 
 ### Agregar una nueva vista/tab
 
@@ -476,64 +371,6 @@ Actualmente los datos viven en memoria (state de React). Para persistir:
 2. **Opcion local (localStorage):** Envolver el state con un efecto que serialize/deserialize a `localStorage`. Util para demos sin backend.
 
 3. **Opcion enterprise (API REST):** Crear endpoints GET/POST/PUT en cualquier backend. El componente `App` consumiria via fetch en un useEffect.
-
----
-
-## Roadmap de producto
-
-### v1.0 (actual) — Mockup funcional para pitch
-
-- 4 vistas completas: Reporte, Ingreso, Simulador, Metodologia
-- Data en memoria con 4 periodos de ejemplo
-- Calculo BH360 funcional con normalizacion y pesos
-- Output como HTML autocontenido
-- Iconos Lucide, graficos Recharts, dark mode, tipografia Outfit
-
-### v1.1 (post-pitch) — Mejoras UX
-
-- [ ] Exportar reporte a PDF (via html2canvas + jsPDF o Puppeteer server-side)
-- [ ] Animacion de transicion entre tabs
-- [ ] Responsive refinado para mobile (radar → barras horizontales en pantallas <640px)
-- [ ] Soporte para multiples marcas/lineas en el selector
-- [ ] Alerta visual cuando una dimension cae por debajo de un umbral configurable
-- [ ] `prefers-reduced-motion` para desactivar animaciones
-
-### v2.0 (si se gana la cuenta) — Produccion
-
-- [ ] Backend con Supabase (o API propia): persistencia, autenticacion, multi-tenant
-- [ ] Historico de periodos con grafico de tendencia del BH360 en el tiempo
-- [ ] Analisis de sensibilidad Monte Carlo integrado (1000 iteraciones, intervalo de confianza al 90%)
-- [ ] Comparativa entre marcas/lineas (San Fernando Total vs Pollo vs Pavo vs Embutidos)
-- [ ] Importacion de datos desde Excel/CSV
-- [ ] Dashboard embeddable (iframe) para que el cliente lo vea en su intranet
-- [ ] Modo light/dark toggle
-- [ ] Pruebas de accesibilidad con axe-core y screen readers
-
-### v3.0 (con historico suficiente) — Optimizacion estadistica
-
-- [ ] Migracion a pesos data-driven via PCA o regresion vs ventas
-- [ ] Benchmarks sectoriales FMCG Peru (si se acumulan datos de 3+ marcas)
-- [ ] Integracion directa con APIs de plataformas (Meta Ads, Google Ads, Kantar IBOPE)
-- [ ] Forecast del BH360 basado en inversion planificada
-
----
-
-## Sustento metodologico
-
-El BH360 se fundamenta en las siguientes fuentes (todas citadas en la vista de Metodologia):
-
-| Fuente | Hallazgo clave | Impacto en BH360 |
-|--------|---------------|-------------------|
-| Binet & Davis (IPA, 2025) | El presupuesto explica el 89% de las variaciones en beneficio | Peso significativo para pilar Input (35%) |
-| Binet & Field (IPA, 2013) | ESOV predice market share growth; 60/40 brand/activation | Peso de Alcance como puente entre inversion y resultados |
-| Brand Finance BrandBeta (2022) | Familiaridad (65%) + consideracion (35%) = 80%+ de varianza en market share | Compra Declarada como metrica de equity mas predictiva (25%) |
-| IPA Databank (1600+ casos) | Numero total de metricas que mejoran predice exito mejor que cualquier metrica individual | Justificacion del indice compuesto como "metrica de metricas" |
-| Field (IPA, 2026) | 93% de campanas con grandes mejoras en trust reportan efectos de negocio | Inclusion de Sentiment como dimension; peso moderado (15%) |
-| Sharp (2010) | Mental availability + physical availability = drivers de crecimiento | Alcance como proxy de mental availability |
-| OCDE/JRC (2008) | Handbook on Constructing Composite Indicators | Normalizacion Min-Max, goalposting, analisis de sensibilidad |
-| ISO 20671 (2019) | Brand evaluation: inputs + stakeholder equity + performance | Estructura tripartita del BH360 |
-| Profit Ability 2 (Ebiquity/Thinkbox, 2024) | TV + BVOD genera 54.7% del beneficio total con ROI de 5.61 | Importancia de canales de amplio alcance |
-| Saisana et al. (2005) | Uncertainty + sensitivity analysis para indices compuestos | Protocolo Monte Carlo para validar robustez de pesos |
 
 ---
 
